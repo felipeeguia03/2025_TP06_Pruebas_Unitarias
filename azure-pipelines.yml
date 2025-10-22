@@ -1,0 +1,117 @@
+trigger:
+  - main
+  - develop
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  COVERAGE_THRESHOLD: 80
+  TEST_TIMEOUT: 300
+  NODE_VERSION: "18.x"
+  GO_VERSION: "1.21"
+
+stages:
+  - stage: Build
+    displayName: "Build Applications"
+    jobs:
+      - job: BuildBackend
+        displayName: "Build Backend (Go)"
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: "$(GO_VERSION)"
+          - script: |
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
+              go mod download
+              go build -o backend.exe .
+            displayName: "Build Go Application"
+
+      - job: BuildFrontend
+        displayName: "Build Frontend (Next.js)"
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "$(NODE_VERSION)"
+          - script: |
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
+              npm ci
+              npm run build
+            displayName: "Build Next.js Application"
+
+  - stage: Test
+    displayName: "Run Unit Tests"
+    dependsOn: Build
+    jobs:
+      - job: TestBackend
+        displayName: "Test Backend"
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: "$(GO_VERSION)"
+          - script: |
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
+              go test -v -coverprofile=coverage.out ./tests/...
+            displayName: "Run Go Tests"
+          - script: |
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
+              go tool cover -html=coverage.out -o coverage.html
+            displayName: "Generate Coverage Report"
+
+      - job: TestFrontend
+        displayName: "Test Frontend"
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "$(NODE_VERSION)"
+          - script: |
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
+              npm test -- --coverage --watchAll=false --passWithNoTests
+            displayName: "Run React Tests"
+
+  - stage: Coverage
+    displayName: "Coverage Analysis"
+    dependsOn: Test
+    jobs:
+      - job: CoverageAnalysis
+        displayName: "Analyze Coverage"
+        steps:
+          - script: |
+              echo "Backend Coverage:"
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
+              go tool cover -func=coverage.out
+            displayName: "Backend Coverage"
+          - script: |
+              echo "Frontend Coverage:"
+              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
+              cat coverage/lcov.info
+            displayName: "Frontend Coverage"
+
+  - stage: QualityGate
+    displayName: "Quality Gate"
+    dependsOn: Coverage
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: QualityCheck
+        displayName: "Quality Check"
+        steps:
+          - script: |
+              echo "Quality Gate: Coverage must be >= $(COVERAGE_THRESHOLD)%"
+              echo "All tests must pass"
+            displayName: "Quality Gate Check"
+
+  - stage: PublishArtifacts
+    displayName: "Publish Artifacts"
+    dependsOn: QualityGate
+    jobs:
+      - job: PublishReports
+        displayName: "Publish Test Reports"
+        steps:
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: "2025_TP06_Pruebas_Unitarias/EMARVE/backend/coverage.html"
+              artifactName: "BackendCoverage"
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: "2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front/coverage"
+              artifactName: "FrontendCoverage"

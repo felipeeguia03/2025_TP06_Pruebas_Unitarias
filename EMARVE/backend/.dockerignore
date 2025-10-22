@@ -1,0 +1,32 @@
+# Archivos de desarrollo
+*.md
+.git
+.gitignore
+.env
+.env.local
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de prueba
+*_test.go
+test/
+tests/
+
+# Documentación
+docs/
+README.md 
