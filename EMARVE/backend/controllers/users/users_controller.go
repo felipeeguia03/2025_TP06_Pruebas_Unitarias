@@ -2,7 +2,7 @@ package users
 
 import (
 	userDomain "backend/domain"
-	userService "backend/services/users"
+	"backend/interfaces"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,8 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type UserController struct {
+	userService interfaces.UserServiceInterface
+}
+
+func NewUserController(userService interfaces.UserServiceInterface) *UserController {
+	return &UserController{userService: userService}
+}
+
 // controllers es el unico que usa gin
-func Login(c *gin.Context) {
+func (uc *UserController) Login(c *gin.Context) {
 	var loginRequest userDomain.LoginRequest
 
 	if err := c.ShouldBindJSON(&loginRequest); err != nil {
@@ -21,7 +29,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := userService.Login(loginRequest.Email, loginRequest.Password)
+	token, err := uc.userService.Login(loginRequest.Email, loginRequest.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, userDomain.Result{
 			Message: fmt.Sprintf("Unauthorized login: %s", err.Error()),
@@ -34,7 +42,7 @@ func Login(c *gin.Context) {
 	})
 }
 
-func UserRegister(c *gin.Context) {
+func (uc *UserController) UserRegister(c *gin.Context) {
 	var registrationRequest userDomain.RegistrationRequest
 
 	if err := c.ShouldBindJSON(&registrationRequest); err != nil {
@@ -44,7 +52,7 @@ func UserRegister(c *gin.Context) {
 		return
 	}
 
-	_, err := userService.UserRegister(registrationRequest.Nickname, registrationRequest.Email, registrationRequest.Password, registrationRequest.Type)
+	_, err := uc.userService.UserRegister(registrationRequest.Nickname, registrationRequest.Email, registrationRequest.Password, registrationRequest.Type)
 	if err != nil {
 		c.JSON(http.StatusConflict, userDomain.Result{
 			Message: fmt.Sprintf("Error in registration: %s", err.Error()),
@@ -57,7 +65,7 @@ func UserRegister(c *gin.Context) {
 	})
 }
 
-func SubscriptionList(c *gin.Context) {
+func (uc *UserController) SubscriptionList(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, userDomain.Result{
@@ -67,7 +75,7 @@ func SubscriptionList(c *gin.Context) {
 		return
 	}
 
-	results, err := userService.SubscriptionList(id)
+	results, err := uc.userService.SubscriptionList(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, userDomain.Result{
 			Message: fmt.Sprintf("error in getting courses: %s", err.Error()),
@@ -81,7 +89,7 @@ func SubscriptionList(c *gin.Context) {
 
 }
 
-func AddComment(c *gin.Context) {
+func (uc *UserController) AddComment(c *gin.Context) {
 	var commentRequest userDomain.CommentRequest
 	if err := c.ShouldBindJSON(&commentRequest); err != nil {
 		c.JSON(http.StatusBadRequest, userDomain.Result{
@@ -90,7 +98,7 @@ func AddComment(c *gin.Context) {
 		return
 	}
 
-	if err := userService.AddComment(commentRequest.UserID, commentRequest.CourseID, commentRequest.Comment); err != nil {
+	if err := uc.userService.AddComment(commentRequest.UserID, commentRequest.CourseID, commentRequest.Comment); err != nil {
 		c.JSON(http.StatusConflict, userDomain.Result{
 			Message: fmt.Sprintf("error in course comment: %s", err.Error()),
 		})
@@ -102,7 +110,7 @@ func AddComment(c *gin.Context) {
 	})
 }
 
-func UploadFiles(c *gin.Context) {
+func (uc *UserController) UploadFiles(c *gin.Context) {
 
 	c.Request.ParseMultipartForm(10 << 20)
 
@@ -133,7 +141,7 @@ func UploadFiles(c *gin.Context) {
 		return
 	}
 
-	err = userService.UploadFiles(file, handler.Filename, userID, courseID)
+	err = uc.userService.UploadFiles(file, handler.Filename, userID, courseID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, userDomain.Result{
 			Message: fmt.Sprintf("Error al guardar el archivo: %s", err.Error()),
@@ -146,7 +154,7 @@ func UploadFiles(c *gin.Context) {
 	})
 }
 
-func UserAuthentication(c *gin.Context) {
+func (uc *UserController) UserAuthentication(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
 		c.JSON(http.StatusUnauthorized, userDomain.Result{
@@ -155,7 +163,7 @@ func UserAuthentication(c *gin.Context) {
 		return
 	}
 
-	userType, err := userService.UserAuthentication(authHeader)
+	userType, err := uc.userService.UserAuthentication(authHeader)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, userDomain.Result{
 			Message: fmt.Sprintf("Unauthorized: %s", err.Error()),
@@ -168,7 +176,7 @@ func UserAuthentication(c *gin.Context) {
 	})
 }
 
-func GetUserID(c *gin.Context) {
+func (uc *UserController) GetUserID(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
 		c.JSON(http.StatusUnauthorized, userDomain.Result{
@@ -177,7 +185,7 @@ func GetUserID(c *gin.Context) {
 		return
 	}
 
-	userID, err := userService.GetUserID(authHeader)
+	userID, err := uc.userService.GetUserID(authHeader)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, userDomain.Result{
 			Message: fmt.Sprintf("Unauthorized: %s", err.Error()),

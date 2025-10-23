@@ -2,7 +2,7 @@ package courses
 
 import (
 	courseDomain "backend/domain"
-	courseService "backend/services/courses"
+	"backend/interfaces"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,10 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SearchCourse(c *gin.Context) {
+type CourseController struct {
+	courseService interfaces.CourseServiceInterface
+}
+
+func NewCourseController(courseService interfaces.CourseServiceInterface) *CourseController {
+	return &CourseController{courseService: courseService}
+}
+
+func (cc *CourseController) SearchCourse(c *gin.Context) {
 
 	query := strings.TrimSpace(c.Query("query"))
-	results, err := courseService.SearchCourse(query)
+	results, err := cc.courseService.SearchCourse(query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, courseDomain.Result{
 			Message: fmt.Sprintf("Error in search: %s", err.Error()),
@@ -28,7 +36,7 @@ func SearchCourse(c *gin.Context) {
 
 }
 
-func GetCourse(c *gin.Context) {
+func (cc *CourseController) GetCourse(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, courseDomain.Result{
@@ -38,7 +46,7 @@ func GetCourse(c *gin.Context) {
 		return
 	}
 
-	course, err := courseService.GetCourse(id)
+	course, err := cc.courseService.GetCourse(id)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, courseDomain.Result{
@@ -52,9 +60,9 @@ func GetCourse(c *gin.Context) {
 
 }
 
-func GetAllCourses(c *gin.Context) {
+func (cc *CourseController) GetAllCourses(c *gin.Context) {
 
-	results, err := courseService.GetAllCourses()
+	results, err := cc.courseService.GetAllCourses()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, courseDomain.Result{
 			Message: fmt.Sprintf("error in search: %s", err.Error()),
@@ -67,7 +75,7 @@ func GetAllCourses(c *gin.Context) {
 	})
 }
 
-func Subscription(c *gin.Context) {
+func (cc *CourseController) Subscription(c *gin.Context) {
 	var subscribeRequest courseDomain.SubscribeRequest
 
 	if err := c.ShouldBindJSON(&subscribeRequest); err != nil {
@@ -77,7 +85,7 @@ func Subscription(c *gin.Context) {
 		return
 	}
 
-	if err := courseService.Subscription(subscribeRequest.UserId, subscribeRequest.CourseId); err != nil {
+	if err := cc.courseService.Subscription(subscribeRequest.UserId, subscribeRequest.CourseId); err != nil {
 		c.JSON(http.StatusConflict, courseDomain.Result{
 			Message: fmt.Sprintf("error in subscription: %s", err.Error()),
 		})
@@ -90,7 +98,7 @@ func Subscription(c *gin.Context) {
 
 }
 
-func CreateCourse(c *gin.Context) {
+func (cc *CourseController) CreateCourse(c *gin.Context) {
 	var courseRequest courseDomain.CourseRequest
 
 	if err := c.ShouldBindJSON(&courseRequest); err != nil {
@@ -100,7 +108,7 @@ func CreateCourse(c *gin.Context) {
 		return
 	}
 
-	if err := courseService.CreateCourse(courseRequest.Title, courseRequest.Description, courseRequest.Category, courseRequest.Instructor, courseRequest.Duration, courseRequest.Requirement); err != nil {
+	if err := cc.courseService.CreateCourse(courseRequest.Title, courseRequest.Description, courseRequest.Category, courseRequest.Instructor, courseRequest.Duration, courseRequest.Requirement); err != nil {
 		c.JSON(http.StatusConflict, courseDomain.Result{
 			Message: fmt.Sprintf("error in creating course: %s", err.Error()),
 		})
@@ -112,7 +120,7 @@ func CreateCourse(c *gin.Context) {
 	})
 }
 
-func UpdateCorse(c *gin.Context) {
+func (cc *CourseController) UpdateCourse(c *gin.Context) {
 	var updateRequest courseDomain.CourseRequest
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -130,7 +138,7 @@ func UpdateCorse(c *gin.Context) {
 		return
 	}
 
-	if err := courseService.UpdateCourse(id, updateRequest.Title, updateRequest.Description, updateRequest.Category, updateRequest.Instructor, updateRequest.Duration, updateRequest.Requirement); err != nil {
+	if err := cc.courseService.UpdateCourse(id, updateRequest.Title, updateRequest.Description, updateRequest.Category, updateRequest.Instructor, updateRequest.Duration, updateRequest.Requirement); err != nil {
 		c.JSON(http.StatusConflict, courseDomain.Result{
 			Message: fmt.Sprintf("error updating: %s", err.Error()),
 		})
@@ -143,7 +151,7 @@ func UpdateCorse(c *gin.Context) {
 
 }
 
-func DeleteCourse(c *gin.Context) {
+func (cc *CourseController) DeleteCourse(c *gin.Context) {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 
@@ -154,7 +162,7 @@ func DeleteCourse(c *gin.Context) {
 		return
 	}
 
-	err = courseService.DeleteCourse(id)
+	err = cc.courseService.DeleteCourse(id)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, courseDomain.Result{
@@ -166,7 +174,7 @@ func DeleteCourse(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func CommentList(c *gin.Context) {
+func (cc *CourseController) CommentList(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, courseDomain.Result{
@@ -176,7 +184,7 @@ func CommentList(c *gin.Context) {
 		return
 	}
 
-	results, err := courseService.CommentList(id)
+	results, err := cc.courseService.CommentList(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, courseDomain.Result{
 			Message: fmt.Sprintf("error in getting comments: %s", err.Error()),

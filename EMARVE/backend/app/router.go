@@ -3,12 +3,27 @@ package app
 import (
 	"backend/controllers/courses"
 	"backend/controllers/users"
+	"backend/dao"
+	"backend/services/courses"
+	"backend/services/users"
 
 	"github.com/gin-gonic/gin"
 )
 
 func MapRoutes(engine *gin.Engine) {
 	//funcion que levanta toda la aplicacion
+
+	// Crear repositorios
+	userRepo := dao.NewUserRepository()
+	courseRepo := dao.NewCourseRepository()
+
+	// Crear servicios con inyección de dependencias
+	userService := users.NewUserService(userRepo)
+	courseService := courses.NewCourseService(courseRepo)
+
+	// Crear controladores con inyección de dependencias
+	userController := users.NewUserController(userService)
+	courseController := courses.NewCourseController(courseService)
 
 	// Health check endpoint
 	engine.GET("/health", func(c *gin.Context) {
@@ -17,19 +32,23 @@ func MapRoutes(engine *gin.Engine) {
 			"message": "Backend is running",
 		})
 	})
-	engine.POST("/users/login", users.Login) //primer parametro la url y como segundo la funcion del controlador
-	engine.POST("/users/register", users.UserRegister)
-	engine.GET("/courses/search", courses.SearchCourse)
-	engine.GET("/courses", courses.GetAllCourses)
-	engine.GET("/courses/:id", courses.GetCourse)
-	engine.POST("/subscriptions", courses.Subscription)
-	engine.POST("/courses/create", courses.CreateCourse)
-	engine.PUT("/courses/update/:id", courses.UpdateCorse)
-	engine.DELETE("/courses/delete/:id", courses.DeleteCourse)
-	engine.GET("/users/subscriptions/:id", users.SubscriptionList)
-	engine.POST("/users/comments", users.AddComment)
-	engine.GET("/courses/comments/:id", courses.CommentList)
-	engine.POST("/upload", users.UploadFiles)
-	engine.GET("/users/authentication", users.UserAuthentication)
-	engine.GET("/users/userId", users.GetUserID)
+
+	// Rutas de usuarios
+	engine.POST("/users/login", userController.Login)
+	engine.POST("/users/register", userController.UserRegister)
+	engine.GET("/users/subscriptions/:id", userController.SubscriptionList)
+	engine.POST("/users/comments", userController.AddComment)
+	engine.POST("/upload", userController.UploadFiles)
+	engine.GET("/users/authentication", userController.UserAuthentication)
+	engine.GET("/users/userId", userController.GetUserID)
+
+	// Rutas de cursos
+	engine.GET("/courses/search", courseController.SearchCourse)
+	engine.GET("/courses", courseController.GetAllCourses)
+	engine.GET("/courses/:id", courseController.GetCourse)
+	engine.POST("/subscriptions", courseController.Subscription)
+	engine.POST("/courses/create", courseController.CreateCourse)
+	engine.PUT("/courses/update/:id", courseController.UpdateCourse)
+	engine.DELETE("/courses/delete/:id", courseController.DeleteCourse)
+	engine.GET("/courses/comments/:id", courseController.CommentList)
 }

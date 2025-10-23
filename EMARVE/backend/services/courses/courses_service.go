@@ -1,9 +1,9 @@
 package courses
 
 import (
-	"backend/clients"
 	"backend/dao"
 	"backend/domain"
+	"backend/interfaces"
 	"time"
 
 	"errors"
@@ -11,11 +11,19 @@ import (
 	"strings"
 )
 
-func SearchCourse(query string) ([]domain.Course, error) {
+type courseService struct {
+	repo interfaces.CourseRepositoryInterface
+}
+
+func NewCourseService(repo interfaces.CourseRepositoryInterface) *courseService {
+	return &courseService{repo: repo}
+}
+
+func (s *courseService) SearchCourse(query string) ([]domain.Course, error) {
 
 	trimmed := strings.TrimSpace(query)
 
-	courses, err := clients.GetCoursewithQuery(trimmed)
+	courses, err := s.repo.GetCoursewithQuery(trimmed)
 
 	if err != nil {
 		return nil, fmt.Errorf("error getting courses from DB: %s", err)
@@ -40,8 +48,8 @@ func SearchCourse(query string) ([]domain.Course, error) {
 	return results, nil
 }
 
-func GetCourse(ID int64) (domain.Course, error) {
-	course, err := clients.GetCourseById(ID)
+func (s *courseService) GetCourse(ID int64) (domain.Course, error) {
+	course, err := s.repo.GetCourseById(ID)
 
 	if err != nil {
 		return domain.Course{}, fmt.Errorf("error getting course from DB: %v", err)
@@ -60,8 +68,8 @@ func GetCourse(ID int64) (domain.Course, error) {
 	}, nil
 }
 
-func GetAllCourses() ([]domain.Course, error) {
-	courses, err := clients.GetCourses()
+func (s *courseService) GetAllCourses() ([]domain.Course, error) {
+	courses, err := s.repo.GetCourses()
 
 	if err != nil {
 		return nil, fmt.Errorf("error getting courses from DB: %s", err)
@@ -86,24 +94,24 @@ func GetAllCourses() ([]domain.Course, error) {
 	return results, nil
 }
 
-func Subscription(userID int64, courseID int64) error {
+func (s *courseService) Subscription(userID int64, courseID int64) error {
 
-	if _, err := clients.GetUserById(userID); err != nil {
+	if _, err := s.repo.GetUserById(userID); err != nil {
 		return fmt.Errorf("error getting user from DB: %v", err)
 	}
 
-	if _, err := clients.GetCourseById(courseID); err != nil {
+	if _, err := s.repo.GetCourseById(courseID); err != nil {
 		return fmt.Errorf("error getting course from DB: %v", err)
 	}
 
-	if err := clients.InsertSubscription(userID, courseID); err != nil {
+	if err := s.repo.InsertSubscription(userID, courseID); err != nil {
 		return fmt.Errorf("error inserting subscription into DB: %v", err)
 	}
 
 	return nil
 }
 
-func CreateCourse(title string, description string, category string, instructor string, duration int64, requirement string) error {
+func (s *courseService) CreateCourse(title string, description string, category string, instructor string, duration int64, requirement string) error {
 
 	if strings.TrimSpace(title) == "" {
 		return errors.New("title is required")
@@ -140,7 +148,7 @@ func CreateCourse(title string, description string, category string, instructor 
 		LastUpdate:   time.Now(),
 	}
 
-	err := clients.CreateCourse(NewCourse)
+	err := s.repo.CreateCourse(NewCourse)
 	if err != nil {
 		return fmt.Errorf("error creating course from DB: %v", err)
 	}
@@ -148,7 +156,7 @@ func CreateCourse(title string, description string, category string, instructor 
 	return nil
 }
 
-func UpdateCourse(courseID int64, title string, description string, category string, instructor string, duration int64, requirement string) error {
+func (s *courseService) UpdateCourse(courseID int64, title string, description string, category string, instructor string, duration int64, requirement string) error {
 
 	if strings.TrimSpace(title) == "" {
 		return errors.New("title is required")
@@ -183,28 +191,28 @@ func UpdateCourse(courseID int64, title string, description string, category str
 		Requirement: requirement,
 	}
 
-	err := clients.UpdateCourse(courseID, courseUpdate)
+	err := s.repo.UpdateCourse(courseID, courseUpdate)
 	if err != nil {
 		return fmt.Errorf("error updating course from DB: %v", err)
 	}
 	return nil
 }
 
-func DeleteCourse(courseID int64) error {
+func (s *courseService) DeleteCourse(courseID int64) error {
 
-	if err := clients.DeleteCourseById(courseID); err != nil {
+	if err := s.repo.DeleteCourseById(courseID); err != nil {
 		return fmt.Errorf("error deleting course in DB: %v", err)
 	}
 
-	if err := clients.DeleteSubscriptionById(courseID); err != nil {
+	if err := s.repo.DeleteSubscriptionById(courseID); err != nil {
 		return fmt.Errorf("error deleting subscriptcion in DB: %v", err)
 	}
 
 	return nil
 }
 
-func CommentList(CourseID int64) ([]domain.CommentResponse, error) {
-	commentIDs, err := clients.GetCommentsByCourseId(CourseID)
+func (s *courseService) CommentList(CourseID int64) ([]domain.CommentResponse, error) {
+	commentIDs, err := s.repo.GetCommentsByCourseId(CourseID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting comments IDs for course ID %d: %v", CourseID, err)
 	}
@@ -212,7 +220,7 @@ func CommentList(CourseID int64) ([]domain.CommentResponse, error) {
 	var comments []dao.Comment
 
 	for _, commentID := range commentIDs {
-		comment, err := clients.GetCommentById(commentID)
+		comment, err := s.repo.GetCommentById(commentID)
 		if err != nil {
 			return nil, fmt.Errorf("error getting comment with ID %d: ", commentID)
 		}

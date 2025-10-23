@@ -1,4 +1,22 @@
 import "@testing-library/jest-dom";
+import { server } from "./src/mocks/server";
+
+// Configurar MSW para tests
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+// Configurar tipos globales
+declare global {
+  var jest: any;
+  var describe: any;
+  var it: any;
+  var expect: any;
+  var beforeEach: any;
+  var beforeAll: any;
+  var afterEach: any;
+  var afterAll: any;
+}
 
 // Mock de Next.js router
 jest.mock("next/router", () => ({
