@@ -192,69 +192,226 @@ func TestLogin_EmptyEmail(t *testing.T) {
 - Datos de entrada extremos
 - Estados de error de dependencias
 
-## 4. Pruebas de Frontend
+## 4. Refactorización de Controllers para Testing
 
-### Tecnologías Elegidas
+### El Problema que Encontramos
 
-**Framework de Testing:**
+Cuando empezamos a escribir las pruebas para los controllers, nos dimos cuenta de que **no podíamos testearlos** porque estaban acoplados directamente a los services. Los controllers llamaban directamente a funciones globales como `userService.Login()` sin poder inyectar mocks.
 
-- **Jest** - Framework principal para JavaScript/TypeScript
-- **@testing-library/react** - Especializada en testing de componentes React
-- **@testing-library/user-event** - Simulación de interacciones del usuario
-- **@testing-library/jest-dom** - Matchers adicionales para DOM
+### Refactorización de User Controller
 
-**Mocking y Simulación:**
+**ANTES (no testeable):**
 
-- **MSW (Mock Service Worker)** - Intercepta requests HTTP y simula respuestas del backend
-- **Jest Mocks** - Para mockear funciones, módulos y dependencias
+```go
+func Login(c *gin.Context) {
+    var loginRequest userDomain.LoginRequest
 
-**Configuración:**
+    if err := c.ShouldBindJSON(&loginRequest); err != nil {
+        // manejo de error
+        return
+    }
 
-- **Next.js Jest Config** - Configuración optimizada para Next.js
-- **jsdom** - Entorno que simula el DOM del navegador
-- **TypeScript** - Soporte completo para TypeScript en tests
+    // ❌ Llamada directa al service - no podemos mockearlo
+    token, err := userService.Login(loginRequest.Email, loginRequest.Password)
+    // resto del código...
+}
+```
 
-### Componentes Testeados
+**DESPUÉS (testeable):**
 
-#### Login Component
+```go
+type UserController struct {
+    userService interfaces.UserServiceInterface
+}
 
-**Funcionalidades probadas:**
+func NewUserController(userService interfaces.UserServiceInterface) *UserController {
+    return &UserController{userService: userService}
+}
 
-- ✅ Renderización correcta del formulario
-- ✅ Manejo de inputs y actualización de estado
-- ✅ Validación de campos requeridos
-- ✅ Login exitoso con credenciales válidas
-- ✅ Manejo de errores con credenciales inválidas
-- ✅ Manejo de errores de red
-- ✅ Redirección a home después del login exitoso
-- ✅ Limpieza de mensajes de error
+func (uc *UserController) Login(c *gin.Context) {
+    var loginRequest userDomain.LoginRequest
 
-**Cobertura:** 8 casos de prueba
+    if err := c.ShouldBindJSON(&loginRequest); err != nil {
+        // manejo de error
+        return
+    }
 
-#### Register Component
+    // ✅ Ahora podemos inyectar un mock
+    token, err := uc.userService.Login(loginRequest.Email, loginRequest.Password)
+    // resto del código...
+}
+```
 
-**Funcionalidades probadas:**
+### Refactorización de Course Controller
 
-- ✅ Renderización correcta del formulario de registro
-- ✅ Manejo de inputs (username, email, password)
-- ✅ Selección de tipo de usuario (Estudiante/Profesor)
-- ✅ Validación de campos requeridos
-- ✅ Registro exitoso
-- ✅ Manejo de errores con campos faltantes
-- ✅ Manejo de errores de red
-- ✅ Redirección a home después del registro exitoso
-- ✅ Mantenimiento del estado del formulario durante cambios
+Hicimos **exactamente lo mismo** con el Course Controller. El problema era idéntico - estaba acoplado directamente a las funciones del service.
 
-**Cobertura:** 9 casos de prueba
+**ANTES:**
 
-### Ejemplo de Prueba Frontend con Estrategia AAA
+```go
+func SearchCourse(c *gin.Context) {
+    query := strings.TrimSpace(c.Query("query"))
+    // ❌ Llamada directa - no testeable
+    results, err := courseService.SearchCourse(query)
+    // resto del código...
+}
+```
+
+**DESPUÉS:**
+
+```go
+type CourseController struct {
+    courseService interfaces.CourseServiceInterface
+}
+
+func NewCourseController(courseService interfaces.CourseServiceInterface) *CourseController {
+    return &CourseController{courseService: courseService}
+}
+
+func (cc *CourseController) SearchCourse(c *gin.Context) {
+    query := strings.TrimSpace(c.Query("query"))
+    // ✅ Ahora testeable con mocks
+    results, err := cc.courseService.SearchCourse(query)
+    // resto del código...
+}
+```
+
+### Refactorización de Course Service
+
+El Course Service también tenía el mismo problema - estaba acoplado directamente a los `clients` en lugar de usar interfaces.
+
+**ANTES:**
+
+```go
+func SearchCourse(query string) ([]domain.Course, error) {
+    trimmed := strings.TrimSpace(query)
+    // ❌ Llamada directa a clients - no testeable
+    courses, err := clients.GetCoursewithQuery(trimmed)
+    // resto del código...
+}
+```
+
+**DESPUÉS:**
+
+```go
+type courseService struct {
+    repo interfaces.CourseRepositoryInterface
+}
+
+func NewCourseService(repo interfaces.CourseRepositoryInterface) *courseService {
+    return &courseService{repo: repo}
+}
+
+func (s *courseService) SearchCourse(query string) ([]domain.Course, error) {
+    trimmed := strings.TrimSpace(query)
+    // ✅ Ahora testeable con mocks
+    courses, err := s.repo.GetCoursewithQuery(trimmed)
+    // resto del código...
+}
+```
+
+### Actualización del Router
+
+Una vez que refactorizamos todos los controllers, tuvimos que actualizar el router para inyectar las dependencias:
+
+```go
+func MapRoutes(engine *gin.Engine) {
+    // Crear repositorios
+    userRepo := dao.NewUserRepository()
+    courseRepo := dao.NewCourseRepository()
+
+    // Crear servicios con inyección de dependencias
+    userService := users.NewUserService(userRepo)
+    courseService := courses.NewCourseService(courseRepo)
+
+    // Crear controladores con inyección de dependencias
+    userController := users.NewUserController(userService)
+    courseController := courses.NewCourseController(courseService)
+
+    // Ahora usamos los métodos de los controllers
+    engine.POST("/users/login", userController.Login)
+    engine.POST("/users/register", userController.UserRegister)
+    engine.GET("/courses/search", courseController.SearchCourse)
+    // resto de rutas...
+}
+```
+
+## 5. Pruebas de Frontend
+
+### Por qué Elegimos Jest y Testing Library
+
+Para el frontend, elegimos **Jest** porque ya viene incluido con Next.js y es el estándar de la industria. Pero lo más importante fue elegir **@testing-library/react** porque se enfoca en **cómo el usuario interactúa** con la aplicación, no en los detalles internos del componente.
+
+### El Problema con MSW
+
+Cuando empezamos a testear los componentes, nos dimos cuenta de que necesitábamos **simular las llamadas HTTP** al backend. Probamos varias opciones pero **MSW (Mock Service Worker)** fue la mejor porque intercepta las requests HTTP reales, no las mockea a nivel de función.
+
+### Configuración de MSW
+
+Primero creamos los handlers que simulan nuestro backend:
+
+```typescript
+// handlers.ts
+import { http, HttpResponse } from "msw";
+
+export const handlers = [
+  http.post("http://localhost:8081/login", async ({ request }) => {
+    const { email, password } = await request.json();
+
+    // Simulamos la lógica del backend
+    if (email === "test@example.com" && password === "password123") {
+      return HttpResponse.json(
+        { token: "mock-jwt-token-123" },
+        { status: 200 }
+      );
+    }
+
+    // Si las credenciales son incorrectas
+    return HttpResponse.json(
+      { message: "Invalid credentials" },
+      { status: 401 }
+    );
+  }),
+
+  http.get("http://localhost:8081/courses", () => {
+    return HttpResponse.json(
+      {
+        result: [{ id: 1, title: "Curso de React" }],
+      },
+      { status: 200 }
+    );
+  }),
+];
+```
+
+Luego configuramos el servidor MSW:
+
+```typescript
+// server.ts
+import { setupServer } from "msw/node";
+import { handlers } from "./handlers";
+
+export const server = setupServer(...handlers);
+```
+
+### Cómo Funciona MSW en los Tests
+
+En cada archivo de test, configuramos MSW para que funcione:
+
+```typescript
+// Login.test.tsx
+import { server } from "../mocks/server";
+
+beforeAll(() => server.listen()); // Levanta el servidor mock
+afterEach(() => server.resetHandlers()); // Reset entre tests
+afterAll(() => server.close()); // Cierra el servidor mock
+```
+
+### Ejemplo de Test del Login Component
 
 ```typescript
 it("handles successful login", async () => {
-  // ARRANGE - Preparar el estado inicial
-  const mockLogin = login as jest.MockedFunction<typeof login>;
-  mockLogin.mockResolvedValue("mock-jwt-token-12345");
-
+  // ARRANGE - Preparar todo lo necesario
   const user = userEvent.setup();
   render(<Login />);
 
@@ -262,85 +419,94 @@ it("handles successful login", async () => {
   const passwordInput = screen.getByLabelText(/contraseña/i);
   const submitButton = screen.getByRole("button", { name: /ingresa/i });
 
-  // ACT - Ejecutar la acción a probar
+  // ACT - Simular lo que haría un usuario real
   await user.type(emailInput, "test@example.com");
   await user.type(passwordInput, "password123");
   await user.click(submitButton);
 
-  // ASSERT - Verificar los resultados esperados
+  // ASSERT - Verificar que todo funcionó
   await waitFor(() => {
-    expect(mockLogin).toHaveBeenCalledWith({
-      email: "test@example.com",
-      password: "password123",
-    });
+    expect(screen.getByText("Login exitoso")).toBeInTheDocument();
   });
-
-  expect(localStorage.setItem).toHaveBeenCalledWith(
-    "tokenType",
-    "mock-jwt-token-12345"
-  );
 });
 ```
 
-### Mocks Implementados
+### Por qué Usamos userEvent
 
-#### MSW Handlers
+En lugar de usar `fireEvent`, usamos **userEvent** porque simula **interacciones reales del usuario**. Por ejemplo, `userEvent.type()` no solo dispara el evento `onChange`, sino que también simula el comportamiento del navegador como el cursor, selección de texto, etc.
 
-```typescript
-export const handlers = [
-  http.post("http://localhost:8081/login", async ({ request }) => {
-    const { email, password } = await request.json();
-    if (email === "test@example.com" && password === "password123") {
-      return HttpResponse.json(
-        { token: "mock-jwt-token-123" },
-        { status: 200 }
-      );
-    }
-    return HttpResponse.json(
-      { message: "Invalid credentials" },
-      { status: 401 }
-    );
-  }),
-];
-```
+### Mocks de Dependencias
 
-#### Jest Mocks
-
-- **Axios functions** - Mock de funciones de API
-- **Next.js router** - Mock de navegación
-- **Window.location** - Mock de redirecciones
-- **localStorage** - Mock de almacenamiento local
-
-#### MSW Server Setup
+También tuvimos que mockear algunas dependencias de Next.js y del navegador:
 
 ```typescript
-beforeAll(() => server.listen()); // Levantar servidor mock
-afterEach(() => server.resetHandlers()); // Reset entre tests
-afterAll(() => server.close()); // Cerrar servidor mock
+// Mock de Next.js router
+jest.mock("next/navigation", () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+  })),
+}));
+
+// Mock de window.location
+const mockLocation = {
+  href: "",
+  assign: jest.fn(),
+  replace: jest.fn(),
+  reload: jest.fn(),
+};
+Object.defineProperty(window, "location", {
+  value: mockLocation,
+  writable: true,
+});
 ```
 
 ### Configuración de Jest
 
-**Cobertura de código:**
+Configuramos Jest para que funcione bien con Next.js y TypeScript:
 
-- **Branches:** 80%
-- **Functions:** 80%
-- **Lines:** 80%
-- **Statements:** 80%
+```javascript
+// jest.config.js
+const nextJest = require("next/jest");
 
-**Entorno de testing:**
+const createJestConfig = nextJest({
+  dir: "./",
+});
 
-- **jsdom** - Simulación del DOM del navegador
-- **TypeScript** - Soporte completo
-- **Next.js** - Configuración optimizada
+const customJestConfig = {
+  setupFilesAfterEnv: ["<rootDir>/__tests__/setup.ts"],
+  testEnvironment: "jsdom",
+  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
+  collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}", "!src/**/*.d.ts"],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
+};
 
-**Scripts de testing:**
+module.exports = createJestConfig(customJestConfig);
+```
+
+### Lo que Aprendimos
+
+1. **MSW es increíble** - Intercepta requests HTTP reales, no las mockea a nivel de función
+2. **Testing Library se enfoca en el usuario** - No nos importa si el componente usa useState o useReducer, solo que funcione
+3. **userEvent es mejor que fireEvent** - Simula interacciones reales del usuario
+4. **Jest con Next.js funciona perfecto** - La configuración es sencilla y potente
+5. **Los mocks de dependencias son necesarios** - Next.js router, window.location, etc.
+
+### Scripts de Testing
+
+Configuramos varios scripts para diferentes escenarios:
 
 ```json
 {
-  "test": "jest", // Ejecutar tests
-  "test:watch": "jest --watch", // Modo watch
-  "test:coverage": "jest --coverage", // Con cobertura
+  "test": "jest", // Tests normales
+  "test:watch": "jest --watch", // Modo watch para desarrollo
+  "test:coverage": "jest --coverage", // Con reporte de cobertura
   "test:ci": "jest --coverage --watchAll=false" // Para CI/CD
 }
 ```
