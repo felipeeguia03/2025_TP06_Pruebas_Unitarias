@@ -14,3 +14,10 @@ type CommentResponse struct {
 type CommentList struct {
 	Result []CommentResponse `json:"results"`
 }
+
+type Comment struct {
+	Id       int64  `json:"id"`
+	UserID   int64  `json:"user_id"`
+	CourseID int64  `json:"course_id"`
+	Comment  string `json:"comment"`
+}

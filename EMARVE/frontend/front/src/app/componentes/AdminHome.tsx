@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { getCourses, deleteCourse, updateCourse, createCourse } from '@/app/utils/axios'; 
-import Curso from '../componentes/Curso';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import NavbarAdmin from './NavbarAdmin';
-import CourseData from '../componentes/CourseData';
+import React, { useEffect, useState } from "react";
+import {
+  getCourses,
+  deleteCourse,
+  updateCourse,
+  createCourse,
+} from "@/app/utils/axios";
+import Curso from "../componentes/Curso";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faExclamationTriangle,
+  faEye,
+} from "@fortawesome/free-solid-svg-icons";
+import NavbarAdmin from "./NavbarAdmin";
+import CourseData from "../componentes/CourseData";
 
 export type course = {
   id: number;
@@ -25,12 +33,12 @@ const AdminHome: React.FC = () => {
     async function fetchCourses() {
       try {
         const data: course[] = await getCourses();
-        setCourses(data); 
+        setCourses(data);
       } catch (error) {
         console.error("Error fetching courses:", error);
       }
     }
-  
+
     fetchCourses();
   }, []);
 
@@ -75,31 +83,46 @@ const AdminHome: React.FC = () => {
 
   return (
     <>
-      <NavbarAdmin onSearchResults={handleSearchResults} onAddCourse={handleAddCourse} /> 
+      <NavbarAdmin
+        onSearchResults={handleSearchResults}
+        onAddCourse={handleAddCourse}
+      />
       <div className="pt-16 w-full flex flex-col items-center justify-start overflow-y-auto">
-        {courses.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <Curso
-                key={course.id}
-                id={course.id}
-                title={course.title}
-                description={course.description}
-                category={course.category}
-                instructor={course.instructor}
-                duration={course.duration}
-                requirement={course.requirement}
-                handleUpdate={handleUpdate}
-                handleDelete={handleDelete}
+        <div className="w-full max-w-6xl mx-auto p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-white">
+              Panel de Administración
+            </h1>
+          </div>
+
+          {courses.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course) => (
+                <Curso
+                  key={course.id}
+                  id={course.id}
+                  title={course.title}
+                  description={course.description}
+                  category={course.category}
+                  instructor={course.instructor}
+                  duration={course.duration}
+                  requirement={course.requirement}
+                  handleUpdate={handleUpdate}
+                  handleDelete={handleDelete}
+                  message="+ Info"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-screen">
+              <FontAwesomeIcon
+                icon={faExclamationTriangle}
+                className="text-red-500 text-6xl mb-4"
               />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center min-h-screen">
-            <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-6xl mb-4" />
-            <p className="text-white text-4xl">No se encontraron cursos</p>
-          </div>
-        )}
+              <p className="text-white text-4xl">No se encontraron cursos</p>
+            </div>
+          )}
+        </div>
         {showModal && (
           <CourseData
             id={courseToUpdate?.id}

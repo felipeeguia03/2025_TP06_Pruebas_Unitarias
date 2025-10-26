@@ -10,8 +10,11 @@ const getApiBaseURL = () => {
   }
 
   // Fallback para desarrollo local
-  return "http://localhost:8081";
+  return "http://localhost:8080";
 };
+
+// Función para obtener la URL base (exportada para uso en otros componentes)
+export const getBaseURL = getApiBaseURL;
 
 const api = axios.create({
   baseURL: getApiBaseURL(),
@@ -222,4 +225,56 @@ export function uploadFile(file, userId, courseId) {
       console.log("Hubo un Error en la subida del archivo:", error);
       throw error;
     });
+}
+
+export function getCourseImages(courseId) {
+  return api
+    .get(`/courses/images/${courseId}`)
+    .then(function (response) {
+      return response.data.results;
+    })
+    .catch(function (error) {
+      console.error(
+        "Hubo un Error en la obtencion de imagenes del curso:",
+        error
+      );
+      throw error;
+    });
+}
+
+export function getUserById(userId) {
+  return api
+    .get(`/users/${userId}`)
+    .then(function (response) {
+      return response.data;
+    })
+    .catch(function (error) {
+      console.error("Hubo un Error en la obtencion del usuario:", error);
+      throw error;
+    });
+}
+
+export function getCoursesByInstructor(instructor) {
+  return api
+    .get(`/courses/instructor/${instructor}`)
+    .then(function (response) {
+      return response.data.results;
+    })
+    .catch(function (error) {
+      console.error(
+        "Hubo un Error en la obtencion de cursos del instructor:",
+        error
+      );
+      throw error;
+    });
+}
+
+export function logout() {
+  // Limpiar localStorage
+  localStorage.removeItem("tokenType");
+  localStorage.removeItem("tokenId");
+  localStorage.removeItem("userId");
+
+  // Redirigir al login
+  window.location.href = "/";
 }

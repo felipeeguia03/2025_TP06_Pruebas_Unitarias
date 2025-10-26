@@ -1,7 +1,8 @@
 package services
 
 import (
-	"backend/dao"
+	"backend/domain"
+	"backend/services/users"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -17,38 +18,46 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
-func (m *MockUserRepository) GetUserByEmail(email string) (*dao.User, error) {
+func (m *MockUserRepository) GetUserByEmail(email string) (*domain.User, error) {
 	args := m.Called(email)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dao.User), args.Error(1)
+	return args.Get(0).(*domain.User), args.Error(1)
 }
 
-func (m *MockUserRepository) CreateUser(user dao.User) error {
+func (m *MockUserRepository) CreateUser(user domain.User) error {
 	args := m.Called(user)
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) GetUserById(id int64) (*dao.User, error) {
+func (m *MockUserRepository) GetUserById(id int64) (*domain.User, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dao.User), args.Error(1)
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
+func (m *MockUserRepository) AddComment(userID, courseID int64, comment string) error {
+	args := m.Called(userID, courseID, comment)
+	return args.Error(0)
 }
 
 func (m *MockUserRepository) GetCourseIdsByUserId(userID int64) ([]int64, error) {
 	args := m.Called(userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).([]int64), args.Error(1)
 }
 
-func (m *MockUserRepository) GetCourseById(courseID int64) (*dao.Course, error) {
+func (m *MockUserRepository) GetCourseById(courseID int64) (*domain.Course, error) {
 	args := m.Called(courseID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dao.Course), args.Error(1)
+	return args.Get(0).(*domain.Course), args.Error(1)
 }
 
 func (m *MockUserRepository) InsertComment(userID, courseID int64, comment string) error {
@@ -56,7 +65,7 @@ func (m *MockUserRepository) InsertComment(userID, courseID int64, comment strin
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) SaveFile(file dao.File) error {
+func (m *MockUserRepository) SaveFile(file domain.File) error {
 	args := m.Called(file)
 	return args.Error(0)
 }
@@ -64,9 +73,9 @@ func (m *MockUserRepository) SaveFile(file dao.File) error {
 func TestLogin_ValidCredentials(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
-	expectedUser := &dao.User{
+	expectedUser := &domain.User{
 		Id:           1,
 		Email:        "test@example.com",
 		PasswordHash: fmt.Sprintf("%x", md5.Sum([]byte("password123"))),
@@ -83,9 +92,9 @@ func TestLogin_ValidCredentials(t *testing.T) {
 func TestLogin_InvalidCredentials(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
-	expectedUser := &dao.User{
+	expectedUser := &domain.User{
 		Id:           1,
 		Email:        "test@example.com",
 		PasswordHash: "wrong-hash",
@@ -107,7 +116,7 @@ func TestLogin_InvalidCredentials(t *testing.T) {
 func TestLogin_UserNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	mockRepo.On("GetUserByEmail", "nonexistent@example.com").Return(nil, errors.New("user not found"))
 
@@ -124,7 +133,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 func TestLogin_EmptyEmail(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	token, err := service.Login("", "password123")
@@ -138,7 +147,7 @@ func TestLogin_EmptyEmail(t *testing.T) {
 func TestLogin_EmptyPassword(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	token, err := service.Login("test@example.com", "")
@@ -152,9 +161,9 @@ func TestLogin_EmptyPassword(t *testing.T) {
 func TestUserRegister_ValidData(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
-	expectedUser := dao.User{
+	expectedUser := domain.User{
 		Nickname:     "testuser",
 		Email:        "test@example.com",
 		PasswordHash: fmt.Sprintf("%x", md5.Sum([]byte("password123"))),
@@ -175,7 +184,7 @@ func TestUserRegister_ValidData(t *testing.T) {
 func TestUserRegister_EmptyNickname(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	result, err := service.UserRegister("", "test@example.com", "password123", false)
@@ -189,7 +198,7 @@ func TestUserRegister_EmptyNickname(t *testing.T) {
 func TestUserRegister_EmptyEmail(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	result, err := service.UserRegister("testuser", "", "password123", false)
@@ -203,7 +212,7 @@ func TestUserRegister_EmptyEmail(t *testing.T) {
 func TestUserRegister_EmptyPassword(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	result, err := service.UserRegister("testuser", "test@example.com", "", false)
@@ -218,10 +227,10 @@ func TestUserRegister_EmptyPassword(t *testing.T) {
 func TestSubscriptionList_ValidUser(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	courseIDs := []int64{1, 2, 3}
-	expectedCourses := []dao.Course{
+	expectedCourses := []domain.Course{
 		{
 			Id:           1,
 			Title:        "Course 1",
@@ -265,7 +274,7 @@ func TestSubscriptionList_ValidUser(t *testing.T) {
 func TestSubscriptionList_UserNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	mockRepo.On("GetCourseIdsByUserId", int64(999)).Return(nil, errors.New("user not found"))
 
@@ -283,10 +292,10 @@ func TestSubscriptionList_UserNotFound(t *testing.T) {
 func TestAddComment_ValidData(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
-	expectedUser := &dao.User{Id: 1, Email: "test@example.com"}
-	expectedCourse := &dao.Course{Id: 1, Title: "Test Course"}
+	expectedUser := &domain.User{Id: 1, Email: "test@example.com"}
+	expectedCourse := &domain.Course{Id: 1, Title: "Test Course"}
 
 	mockRepo.On("GetUserById", int64(1)).Return(expectedUser, nil)
 	mockRepo.On("GetCourseById", int64(1)).Return(expectedCourse, nil)
@@ -303,7 +312,7 @@ func TestAddComment_ValidData(t *testing.T) {
 func TestAddComment_UserNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	mockRepo.On("GetUserById", int64(999)).Return(nil, errors.New("user not found"))
 
@@ -319,9 +328,9 @@ func TestAddComment_UserNotFound(t *testing.T) {
 func TestAddComment_CourseNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
-	expectedUser := &dao.User{Id: 1, Email: "test@example.com"}
+	expectedUser := &domain.User{Id: 1, Email: "test@example.com"}
 
 	mockRepo.On("GetUserById", int64(1)).Return(expectedUser, nil)
 	mockRepo.On("GetCourseById", int64(999)).Return(nil, errors.New("course not found"))
@@ -338,7 +347,7 @@ func TestAddComment_CourseNotFound(t *testing.T) {
 func TestAddComment_EmptyComment(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	err := service.AddComment(1, 1, "")
@@ -352,7 +361,7 @@ func TestAddComment_EmptyComment(t *testing.T) {
 func TestUserAuthentication_ValidToken(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act - Necesitarías un token JWT válido para este test
 	// Por simplicidad, aquí solo verificamos el caso de token inválido
@@ -366,7 +375,7 @@ func TestUserAuthentication_ValidToken(t *testing.T) {
 func TestUserAuthentication_EmptyToken(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	userType, err := service.UserAuthentication("")
@@ -381,7 +390,7 @@ func TestUserAuthentication_EmptyToken(t *testing.T) {
 func TestGetUserID_ValidToken(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act - Necesitarías un token JWT válido para este test
 	// Por simplicidad, aquí solo verificamos el caso de token inválido
@@ -395,7 +404,7 @@ func TestGetUserID_ValidToken(t *testing.T) {
 func TestGetUserID_EmptyToken(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
-	service := NewUserService(mockRepo)
+	service := users.NewUserService(mockRepo)
 
 	// Act
 	userID, err := service.GetUserID("")
@@ -404,4 +413,123 @@ func TestGetUserID_EmptyToken(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, 0, userID)
 	assert.Contains(t, err.Error(), "bearer token is required")
+}
+
+// Tests para nuevos métodos
+
+func TestGetUserById_Success(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	service := users.NewUserService(mockRepo)
+
+	// Configurar mock
+	expectedUser := &domain.User{
+		Id:       1,
+		Nickname: "usuario1",
+		Email:    "usuario1@test.com",
+		Type:     false,
+	}
+	mockRepo.On("GetUserById", int64(1)).Return(expectedUser, nil)
+
+	// Ejecutar
+	result, err := service.GetUserById(1)
+
+	// Verificar
+	assert.NoError(t, err)
+	assert.Equal(t, expectedUser, result)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetUserById_InvalidUserID(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	service := users.NewUserService(mockRepo)
+
+	// Ejecutar con ID inválido
+	result, err := service.GetUserById(0)
+
+	// Verificar
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid user ID")
+	assert.Nil(t, result)
+}
+
+func TestGetUserById_RepositoryError(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	service := users.NewUserService(mockRepo)
+
+	// Configurar mock para error
+	mockRepo.On("GetUserById", int64(1)).Return(nil, errors.New("database error"))
+
+	// Ejecutar
+	result, err := service.GetUserById(1)
+
+	// Verificar
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error getting user from DB")
+	assert.Nil(t, result)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAddComment_Success(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	service := users.NewUserService(mockRepo)
+
+	// Configurar mock
+	expectedUser := &domain.User{
+		Id:       1,
+		Nickname: "usuario1",
+		Email:    "usuario1@test.com",
+		Type:     false,
+	}
+	expectedCourse := &domain.Course{
+		Id:          1,
+		Title:       "Curso 1",
+		Description: "Descripción del curso",
+		Category:    "Programación",
+		Instructor:  "profesor1",
+		Duration:    40,
+		Requirement: "Ninguno",
+	}
+	mockRepo.On("GetUserById", int64(1)).Return(expectedUser, nil)
+	mockRepo.On("GetCourseById", int64(1)).Return(expectedCourse, nil)
+	mockRepo.On("InsertComment", int64(1), int64(1), "Excelente curso").Return(nil)
+
+	// Ejecutar
+	err := service.AddComment(1, 1, "Excelente curso")
+
+	// Verificar
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAddComment_RepositoryError(t *testing.T) {
+	mockRepo := new(MockUserRepository)
+	service := users.NewUserService(mockRepo)
+
+	// Configurar mock para error
+	expectedUser := &domain.User{
+		Id:       1,
+		Nickname: "usuario1",
+		Email:    "usuario1@test.com",
+		Type:     false,
+	}
+	expectedCourse := &domain.Course{
+		Id:          1,
+		Title:       "Curso 1",
+		Description: "Descripción del curso",
+		Category:    "Programación",
+		Instructor:  "profesor1",
+		Duration:    40,
+		Requirement: "Ninguno",
+	}
+	mockRepo.On("GetUserById", int64(1)).Return(expectedUser, nil)
+	mockRepo.On("GetCourseById", int64(1)).Return(expectedCourse, nil)
+	mockRepo.On("InsertComment", int64(1), int64(1), "Excelente curso").Return(errors.New("database error"))
+
+	// Ejecutar
+	err := service.AddComment(1, 1, "Excelente curso")
+
+	// Verificar
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error inserting comment into DB")
+	mockRepo.AssertExpectations(t)
 }

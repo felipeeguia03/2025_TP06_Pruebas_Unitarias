@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"backend/controllers/courses"
 	"backend/domain"
 	"bytes"
 	"encoding/json"
@@ -58,11 +59,21 @@ func (m *MockCourseService) CommentList(courseID int64) ([]domain.CommentRespons
 	return args.Get(0).([]domain.CommentResponse), args.Error(1)
 }
 
+func (m *MockCourseService) GetCoursesByInstructor(instructor string) ([]domain.Course, error) {
+	args := m.Called(instructor)
+	return args.Get(0).([]domain.Course), args.Error(1)
+}
+
+func (m *MockCourseService) GetCourseImages(courseID int64) ([]domain.File, error) {
+	args := m.Called(courseID)
+	return args.Get(0).([]domain.File), args.Error(1)
+}
+
 func TestSearchCourse_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	expectedCourses := []domain.Course{
 		{Id: 1, Title: "Go Programming", Description: "Learn Go"},
@@ -94,7 +105,7 @@ func TestSearchCourse_Error(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	mockService.On("SearchCourse", "invalid").Return([]domain.Course{}, assert.AnError)
 
@@ -114,7 +125,7 @@ func TestGetCourse_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	expectedCourse := domain.Course{
 		Id:          1,
@@ -151,7 +162,7 @@ func TestGetCourse_NotFound(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	mockService.On("GetCourse", int64(999)).Return(domain.Course{}, assert.AnError)
 
@@ -171,7 +182,7 @@ func TestGetCourse_InvalidID(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	// Act
 	w := httptest.NewRecorder()
@@ -188,7 +199,7 @@ func TestGetAllCourses_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	expectedCourses := []domain.Course{
 		{Id: 1, Title: "Course 1", Description: "Description 1"},
@@ -219,7 +230,7 @@ func TestSubscription_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	subscribeRequest := domain.SubscribeRequest{
 		UserId:   1,
@@ -253,7 +264,7 @@ func TestSubscription_Conflict(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	subscribeRequest := domain.SubscribeRequest{
 		UserId:   1,
@@ -281,7 +292,7 @@ func TestCreateCourse_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	courseRequest := domain.CourseRequest{
 		Title:       "New Course",
@@ -319,7 +330,7 @@ func TestCreateCourse_Conflict(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	courseRequest := domain.CourseRequest{
 		Title:       "New Course",
@@ -351,7 +362,7 @@ func TestUpdateCourse_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	courseRequest := domain.CourseRequest{
 		Title:       "Updated Course",
@@ -390,7 +401,7 @@ func TestDeleteCourse_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	mockService.On("DeleteCourse", int64(1)).Return(nil)
 
@@ -402,7 +413,7 @@ func TestDeleteCourse_Success(t *testing.T) {
 	controller.DeleteCourse(c)
 
 	// Assert
-	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 	mockService.AssertExpectations(t)
 }
 
@@ -410,7 +421,7 @@ func TestDeleteCourse_NotFound(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	mockService.On("DeleteCourse", int64(999)).Return(assert.AnError)
 
@@ -430,7 +441,7 @@ func TestCommentList_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	expectedComments := []domain.CommentResponse{
 		{UserID: 1, Comment: "Great course!"},
@@ -462,7 +473,7 @@ func TestCommentList_NotFound(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockCourseService)
-	controller := NewCourseController(mockService)
+	controller := courses.NewCourseController(mockService)
 
 	mockService.On("CommentList", int64(999)).Return([]domain.CommentResponse{}, assert.AnError)
 
@@ -475,5 +486,185 @@ func TestCommentList_NotFound(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, http.StatusNotFound, w.Code)
+	mockService.AssertExpectations(t)
+}
+
+// Tests para nuevos métodos
+
+func TestGetCoursesByInstructor_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Configurar mock
+	expectedCourses := []domain.Course{
+		{Id: 1, Title: "Curso 1", Instructor: "profesor1"},
+		{Id: 2, Title: "Curso 2", Instructor: "profesor1"},
+	}
+	mockService.On("GetCoursesByInstructor", "profesor1").Return(expectedCourses, nil)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/courses/instructor/profesor1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "instructor", Value: "profesor1"}}
+
+	// Ejecutar
+	controller.GetCoursesByInstructor(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response domain.ListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedCourses, response.Result)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetCoursesByInstructor_EmptyInstructor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Crear request con instructor vacío
+	req, _ := http.NewRequest("GET", "/courses/instructor/", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "instructor", Value: ""}}
+
+	// Ejecutar
+	controller.GetCoursesByInstructor(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "instructor parameter is required")
+}
+
+func TestGetCoursesByInstructor_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Configurar mock para error
+	mockService.On("GetCoursesByInstructor", "profesor1").Return([]domain.Course{}, assert.AnError)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/courses/instructor/profesor1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "instructor", Value: "profesor1"}}
+
+	// Ejecutar
+	controller.GetCoursesByInstructor(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "error getting courses for instructor")
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetCourseImages_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Configurar mock
+	expectedFiles := []domain.File{
+		{Id: 1, Name: "imagen1.jpg", Course_Id: 1},
+		{Id: 2, Name: "documento.pdf", Course_Id: 1},
+	}
+	mockService.On("GetCourseImages", int64(1)).Return(expectedFiles, nil)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/courses/images/1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	// Ejecutar
+	controller.GetCourseImages(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response domain.FileListResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedFiles, response.Result)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetCourseImages_InvalidID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Crear request con ID inválido
+	req, _ := http.NewRequest("GET", "/courses/images/invalid", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "invalid"}}
+
+	// Ejecutar
+	controller.GetCourseImages(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "invalid id")
+}
+
+func TestGetCourseImages_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockCourseService)
+	controller := courses.NewCourseController(mockService)
+
+	// Configurar mock para error
+	mockService.On("GetCourseImages", int64(1)).Return([]domain.File{}, assert.AnError)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/courses/images/1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	// Ejecutar
+	controller.GetCourseImages(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "error getting images for course")
+
 	mockService.AssertExpectations(t)
 }

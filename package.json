@@ -1,0 +1,46 @@
+{
+  "name": "tp06-pruebas-unitarias",
+  "version": "1.0.0",
+  "description": "TP 06 - Pruebas Unitarias - Scripts Profesionales",
+  "scripts": {
+    "test": "npm run test:backend",
+    "test:backend": "cd EMARVE/backend && go test ./tests/unit/controllers/... -v -cover",
+    "test:frontend": "cd EMARVE/frontend/front && npm test -- --watchAll=false",
+    "test:coverage": "cd EMARVE/backend && go test ./tests/unit/controllers/... -cover -coverprofile=coverage.out && go tool cover -html=coverage.out -o coverage.html",
+    "test:ci": "npm run test:backend",
+    "install": "npm run install:backend && npm run install:frontend",
+    "install:backend": "cd EMARVE/backend && go mod tidy && go mod download",
+    "install:frontend": "cd EMARVE/frontend/front && npm ci",
+    "clean": "npm run clean:backend && npm run clean:frontend",
+    "clean:backend": "cd EMARVE/backend && go clean -cache && rm -f coverage.out coverage.html",
+    "clean:frontend": "cd EMARVE/frontend/front && rm -rf node_modules/.cache",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd EMARVE/backend && go vet ./...",
+    "lint:frontend": "cd EMARVE/frontend/front && npm run lint || echo 'Linter del frontend no configurado'",
+    "format": "npm run format:backend && npm run format:frontend",
+    "format:backend": "cd EMARVE/backend && go fmt ./...",
+    "format:frontend": "cd EMARVE/frontend/front && npm run format || echo 'Formatter del frontend no configurado'",
+    "dev": "npm run install && npm run test",
+    "ci": "npm run install && npm run test:coverage && npm run lint",
+    "stats": "echo '📊 Estadísticas del Proyecto' && echo '==========================' && echo 'Backend:' && cd EMARVE/backend && echo '  Archivos Go:' $(find . -name '*.go' | wc -l) && echo 'Frontend:' && cd EMARVE/frontend/front && echo '  Archivos JS/TS:' $(find . -name '*.js' -o -name '*.ts' -o -name '*.jsx' -o -name '*.tsx' | wc -l)"
+  },
+  "keywords": [
+    "testing",
+    "unit-tests",
+    "go",
+    "javascript",
+    "jest",
+    "backend",
+    "frontend"
+  ],
+  "author": "TP 06 - Pruebas Unitarias",
+  "license": "MIT",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

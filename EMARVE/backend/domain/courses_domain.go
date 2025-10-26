@@ -22,6 +22,10 @@ type SearchResponse struct {
 	Result []Course `json:"results"`
 }
 
+type FileListResponse struct {
+	Result []File `json:"results"`
+}
+
 type SubscribeRequest struct {
 	UserId   int64 `json:"user_id"`
 	CourseId int64 `json:"course_id"`

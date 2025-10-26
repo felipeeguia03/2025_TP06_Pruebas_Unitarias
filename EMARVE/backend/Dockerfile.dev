@@ -1,0 +1,29 @@
+# Dockerfile para desarrollo del backend
+FROM golang:1.25-alpine
+
+# Instalar dependencias necesarias
+RUN apk add --no-cache git bash mysql-client
+
+# Instalar Air para hot reload
+RUN go install github.com/air-verse/air@latest
+
+# Crear directorio de trabajo
+WORKDIR /app
+
+# Copiar go.mod y go.sum
+COPY go.mod go.sum ./
+
+# Descargar dependencias
+RUN go mod download
+
+# Copiar el resto del código
+COPY . .
+
+# Crear directorio de uploads
+RUN mkdir -p /app/uploads
+
+# Exponer puerto
+EXPOSE 8080
+
+# Comando por defecto (Air para hot reload)
+CMD ["air", "-c", ".air.toml"]

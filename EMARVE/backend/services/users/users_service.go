@@ -1,7 +1,6 @@
 package users
 
 import (
-	"backend/dao"
 	"backend/domain"
 	"backend/interfaces"
 	"crypto/md5"
@@ -16,7 +15,6 @@ import (
 )
 
 type userService struct {
-
 	repo interfaces.UserRepositoryInterface
 }
 
@@ -76,7 +74,7 @@ func (s *userService) UserRegister(nickname string, email string, password strin
 
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
 
-	NewUser := dao.User{
+	NewUser := domain.User{
 		Nickname:     nickname,
 		Email:        email,
 		PasswordHash: hash,
@@ -97,7 +95,7 @@ func (s *userService) SubscriptionList(UserID int64) ([]domain.Course, error) {
 		return nil, fmt.Errorf("error getting course IDs for user ID %d: %v", UserID, err)
 	}
 
-	var courses []dao.Course
+	var courses []domain.Course
 
 	for _, courseID := range courseIDs {
 		course, err := s.repo.GetCourseById(courseID)
@@ -127,6 +125,9 @@ func (s *userService) SubscriptionList(UserID int64) ([]domain.Course, error) {
 }
 
 func (s *userService) AddComment(userID int64, courseID int64, comment string) error {
+	if strings.TrimSpace(comment) == "" {
+		return errors.New("comment is required")
+	}
 
 	if _, err := s.repo.GetUserById(userID); err != nil {
 		return fmt.Errorf("error getting user from DB: %v", err)
@@ -134,10 +135,6 @@ func (s *userService) AddComment(userID int64, courseID int64, comment string) e
 
 	if _, err := s.repo.GetCourseById(courseID); err != nil {
 		return fmt.Errorf("error getting course from DB: %v", err)
-	}
-
-	if strings.TrimSpace(comment) == "" {
-		return errors.New("comment is required")
 	}
 
 	if err := s.repo.InsertComment(userID, courseID, comment); err != nil {
@@ -150,7 +147,7 @@ func (s *userService) AddComment(userID int64, courseID int64, comment string) e
 func (s *userService) UploadFiles(file io.Reader, filename string, userID int64, courseID int64) error {
 	filePath := fmt.Sprintf("uploads/%s", filename)
 
-	fileRecord := dao.File{
+	fileRecord := domain.File{
 		User_Id:    userID,
 		Course_Id:  courseID,
 		Name:       filename,
@@ -174,6 +171,19 @@ func (s *userService) UploadFiles(file io.Reader, filename string, userID int64,
 	}
 
 	return nil
+}
+
+func (s *userService) GetUserById(userID int64) (*domain.User, error) {
+	if userID <= 0 {
+		return nil, errors.New("invalid user ID")
+	}
+
+	user, err := s.repo.GetUserById(userID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting user from DB: %v", err)
+	}
+
+	return user, nil
 }
 
 func (s *userService) UserAuthentication(tokenString string) (string, error) {

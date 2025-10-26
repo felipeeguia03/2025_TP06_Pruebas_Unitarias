@@ -109,6 +109,20 @@ func TestLogin_ValidCredentials(t *testing.T) {
     assert.NotEmpty(t, token)
     mockRepo.AssertExpectations(t)
 }
+
+Firma de las funciones test:
+func TestLogin_ValidCredentials( t *testing.T)
+-TestLogin_ValidCredentials: nombre del test, empieza con Test para que go test lo detecte automaticamente
+-t *testing.T: parámetro obligatorio para cualquier test en Go, es un puntero a un struct que Go proporciona para controlar el test, es decir, marcar errores, hacer logs, etc
+
+assert.NoError(t, err) -> Verifica que la variable err sea nil
+en nuestro código: log no es error porque las credenciales son correctas
+
+assert.NotEmpty(t, token)-> verifica que la variable token no esté vacía
+en nuestro código: la función login retorno un JWT válido
+
+mockRepo.AssertExpectations(t)-> verifica que todas las llamadas al mock se hicieron
+en nuestro código: GetUserByEmail("test@example.com") sera llamado exactamente una vez, sino dara error
 ```
 
 ### Estrategia AAA (Arrange-Act-Assert)
@@ -219,7 +233,7 @@ func Login(c *gin.Context) {
 
 **DESPUÉS (testeable):**
 
-```go
+````go
 type UserController struct {
     userService interfaces.UserServiceInterface
 }
@@ -240,75 +254,11 @@ func (uc *UserController) Login(c *gin.Context) {
     token, err := uc.userService.Login(loginRequest.Email, loginRequest.Password)
     // resto del código...
 }
-```
 
-### Refactorización de Course Controller
 
 Hicimos **exactamente lo mismo** con el Course Controller. El problema era idéntico - estaba acoplado directamente a las funciones del service.
 
-**ANTES:**
 
-```go
-func SearchCourse(c *gin.Context) {
-    query := strings.TrimSpace(c.Query("query"))
-    // ❌ Llamada directa - no testeable
-    results, err := courseService.SearchCourse(query)
-    // resto del código...
-}
-```
-
-**DESPUÉS:**
-
-```go
-type CourseController struct {
-    courseService interfaces.CourseServiceInterface
-}
-
-func NewCourseController(courseService interfaces.CourseServiceInterface) *CourseController {
-    return &CourseController{courseService: courseService}
-}
-
-func (cc *CourseController) SearchCourse(c *gin.Context) {
-    query := strings.TrimSpace(c.Query("query"))
-    // ✅ Ahora testeable con mocks
-    results, err := cc.courseService.SearchCourse(query)
-    // resto del código...
-}
-```
-
-### Refactorización de Course Service
-
-El Course Service también tenía el mismo problema - estaba acoplado directamente a los `clients` en lugar de usar interfaces.
-
-**ANTES:**
-
-```go
-func SearchCourse(query string) ([]domain.Course, error) {
-    trimmed := strings.TrimSpace(query)
-    // ❌ Llamada directa a clients - no testeable
-    courses, err := clients.GetCoursewithQuery(trimmed)
-    // resto del código...
-}
-```
-
-**DESPUÉS:**
-
-```go
-type courseService struct {
-    repo interfaces.CourseRepositoryInterface
-}
-
-func NewCourseService(repo interfaces.CourseRepositoryInterface) *courseService {
-    return &courseService{repo: repo}
-}
-
-func (s *courseService) SearchCourse(query string) ([]domain.Course, error) {
-    trimmed := strings.TrimSpace(query)
-    // ✅ Ahora testeable con mocks
-    courses, err := s.repo.GetCoursewithQuery(trimmed)
-    // resto del código...
-}
-```
 
 ### Actualización del Router
 
@@ -334,102 +284,109 @@ func MapRoutes(engine *gin.Engine) {
     engine.GET("/courses/search", courseController.SearchCourse)
     // resto de rutas...
 }
-```
+````
 
 ## 5. Pruebas de Frontend
 
-### Por qué Elegimos Jest y Testing Library
+Para el Mocking de APIs decidimos usar MSW (Mock Service Worker)debido a que intercepta requests HTTP y simula respuestas de backend. Jest po su parte lo usamos para ejecutar los test
 
-Para el frontend, elegimos **Jest** porque ya viene incluido con Next.js y es el estándar de la industria. Pero lo más importante fue elegir **@testing-library/react** porque se enfoca en **cómo el usuario interactúa** con la aplicación, no en los detalles internos del componente.
+Lo que queremos hacer es probar el componente Login de React de forma aislada para verificar:
+-Renderización correcta
+-Inputs funcionan y actualizan el estado
+-Comportamiento esperado ante login exitoso o fallido
+-Muestra de mensaje de error
+-Redireccion al home cuando el login es unitario
 
-### El Problema con MSW
+Para eso nos apoyamos de MSW:
+handlers.ts
 
-Cuando empezamos a testear los componentes, nos dimos cuenta de que necesitábamos **simular las llamadas HTTP** al backend. Probamos varias opciones pero **MSW (Mock Service Worker)** fue la mejor porque intercepta las requests HTTP reales, no las mockea a nivel de función.
-
-### Configuración de MSW
-
-Primero creamos los handlers que simulan nuestro backend:
-
-```typescript
-// handlers.ts
-import { http, HttpResponse } from "msw";
+import { http, HttpResponse } from 'msw'
 
 export const handlers = [
-  http.post("http://localhost:8081/login", async ({ request }) => {
-    const { email, password } = await request.json();
+http.post('http://localhost:8081/login', async ({ request }) => {
+const { email, password } = await request.json()
+if (email === 'test@example.com' && password === 'password123') {
+return HttpResponse.json({ token: 'mock-jwt-token-123' }, { status: 200 })
+}
+return HttpResponse.json({ message: 'Invalid credentials' }, { status: 401 })
+}),
+http.get('http://localhost:8081/courses', () => {
+return HttpResponse.json({ result: [{ id: 1, title: 'Curso de React' }] }, { status: 200 })
+})
+]
 
-    // Simulamos la lógica del backend
-    if (email === "test@example.com" && password === "password123") {
-      return HttpResponse.json(
-        { token: "mock-jwt-token-123" },
-        { status: 200 }
-      );
-    }
+Este fragmento de código simula endpoints del backend (/login, /courses) con respuestas totalmente controladas, permitiendo probar todos los casos (exito, error, error de network) simualando un backend que devuelve datos fijos
 
-    // Si las credenciales son incorrectas
-    return HttpResponse.json(
-      { message: "Invalid credentials" },
-      { status: 401 }
-    );
-  }),
+server.ts:
 
-  http.get("http://localhost:8081/courses", () => {
-    return HttpResponse.json(
-      {
-        result: [{ id: 1, title: "Curso de React" }],
-      },
-      { status: 200 }
-    );
-  }),
-];
-```
+import { setupServer } from 'msw/node'
+import { handlers } from './handlers'
 
-Luego configuramos el servidor MSW:
+export const server = setupServer(...handlers)
 
-```typescript
-// server.ts
-import { setupServer } from "msw/node";
-import { handlers } from "./handlers";
+aca lo que hacemos es levantar un mini servidor MSW en Node.js para que Jest lo use en los tests, lo usamos de la siguiente manera:
 
-export const server = setupServer(...handlers);
-```
+beforeAll(() => server.listen()) -> antes de todos los tests, leevanta nuestro mock server
 
-### Cómo Funciona MSW en los Tests
+afterEach(() => server.resetHandlers()) --> despues de cada test, resetea los handlers y cualquier request pendiente
 
-En cada archivo de test, configuramos MSW para que funcione:
-
-```typescript
-// Login.test.tsx
-import { server } from "../mocks/server";
-
-beforeAll(() => server.listen()); // Levanta el servidor mock
-afterEach(() => server.resetHandlers()); // Reset entre tests
-afterAll(() => server.close()); // Cierra el servidor mock
-```
+afterAll(() => server.close()) -->al final de todos los tests, cierra el mock server
 
 ### Ejemplo de Test del Login Component
 
+**Firma de la función test:**
+
 ```typescript
 it("handles successful login", async () => {
-  // ARRANGE - Preparar todo lo necesario
-  const user = userEvent.setup();
-  render(<Login />);
+```
 
-  const emailInput = screen.getByLabelText(/email/i);
-  const passwordInput = screen.getByLabelText(/contraseña/i);
-  const submitButton = screen.getByRole("button", { name: /ingresa/i });
+- `it()` - Función de Jest para definir un test individual
+- `"handles successful login"` - Descripción del test, explica qué comportamiento estamos probando
+- `async` - Necesario porque usamos `await` para operaciones asíncronas
+- `() => {}` - Arrow function que contiene la lógica del test
 
-  // ACT - Simular lo que haría un usuario real
-  await user.type(emailInput, "test@example.com");
-  await user.type(passwordInput, "password123");
-  await user.click(submitButton);
+**ARRANGE - Preparar el estado inicial:**
 
-  // ASSERT - Verificar que todo funcionó
-  await waitFor(() => {
-    expect(screen.getByText("Login exitoso")).toBeInTheDocument();
-  });
+```typescript
+// ARRANGE - Preparar todo lo necesario
+const user = userEvent.setup();
+render(<Login />);
+
+const emailInput = screen.getByLabelText(/email/i);
+const passwordInput = screen.getByLabelText(/contraseña/i);
+const submitButton = screen.getByRole("button", { name: /ingresa/i });
+```
+
+- `userEvent.setup()` - Configura el simulador de interacciones del usuario
+- `render(<Login />)` - Renderiza el componente Login en el DOM virtual
+- `screen.getByLabelText()` - Busca elementos por su label (más accesible que por ID)
+- `screen.getByRole()` - Busca elementos por su rol semántico (button, input, etc.)
+
+**ACT - Ejecutar la acción a probar:**
+
+```typescript
+// ACT - Simular lo que haría un usuario real
+await user.type(emailInput, "test@example.com");
+await user.type(passwordInput, "password123");
+await user.click(submitButton);
+```
+
+- `user.type()` - Simula escribir texto en un input (dispara onChange, onFocus, etc.)
+- `await` - Espera a que la interacción termine antes de continuar
+- `user.click()` - Simula hacer click en un elemento
+
+**ASSERT - Verificar los resultados:**
+
+```typescript
+// ASSERT - Verificar que todo funcionó
+await waitFor(() => {
+  expect(screen.getByText("Login exitoso")).toBeInTheDocument();
 });
 ```
+
+- `waitFor()` - Espera a que aparezca el elemento (para operaciones asíncronas)
+- `expect().toBeInTheDocument()` - Verifica que el elemento esté presente en el DOM
+- `screen.getByText()` - Busca elementos por su texto visible
 
 ### Por qué Usamos userEvent
 
@@ -490,14 +447,6 @@ const customJestConfig = {
 module.exports = createJestConfig(customJestConfig);
 ```
 
-### Lo que Aprendimos
-
-1. **MSW es increíble** - Intercepta requests HTTP reales, no las mockea a nivel de función
-2. **Testing Library se enfoca en el usuario** - No nos importa si el componente usa useState o useReducer, solo que funcione
-3. **userEvent es mejor que fireEvent** - Simula interacciones reales del usuario
-4. **Jest con Next.js funciona perfecto** - La configuración es sencilla y potente
-5. **Los mocks de dependencias son necesarios** - Next.js router, window.location, etc.
-
 ### Scripts de Testing
 
 Configuramos varios scripts para diferentes escenarios:
@@ -550,8 +499,6 @@ Configuramos varios scripts para diferentes escenarios:
 - **47+ pruebas backend** (Go + Testify)
 - **17 pruebas frontend** (React + Jest + Testing Library)
 - **64+ pruebas unitarias** en total
-
-**¡Sistema de testing completo y funcional para backend y frontend!** 🚀
 
 ## 7. CI/CD Pipeline
 

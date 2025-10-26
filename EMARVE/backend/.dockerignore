@@ -1,32 +1,7 @@
-# Archivos de desarrollo
-*.md
-.git
-.gitignore
-.env
-.env.local
-
-# Logs
+vendor/
+tmp/
 *.log
-
-# Archivos temporales
-*.tmp
-*.temp
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Sistema operativo
-.DS_Store
-Thumbs.db
-
-# Archivos de prueba
-*_test.go
-test/
-tests/
-
-# Documentación
-docs/
-README.md 
+coverage.out
+coverage.html
+main
+backend.exe

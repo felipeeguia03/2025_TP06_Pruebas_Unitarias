@@ -1,0 +1,71 @@
+services:
+  # Base de datos MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: emarve-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: emarve_db
+      MYSQL_USER: emarve_user
+      MYSQL_PASSWORD: emarve_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./EMARVE/backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - emarve-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend Go
+  backend:
+    build:
+      context: ./EMARVE/backend
+      dockerfile: Dockerfile
+    container_name: emarve-backend
+    environment:
+      DB_HOST: mysql
+      DB_USER: emarve_user
+      DB_PASSWORD: emarve_password
+      DB_NAME: emarve_db
+      DB_PORT: 3306
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./EMARVE/backend/uploads:/app/uploads
+    networks:
+      - emarve-network
+    restart: unless-stopped
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./EMARVE/frontend/front
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    container_name: emarve-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - emarve-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  emarve-network:
+    driver: bridge

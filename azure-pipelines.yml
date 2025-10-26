@@ -1,117 +1,164 @@
-trigger:
-  - main
-  - develop
+# Azure DevOps Pipeline Configuration
+# ===================================
 
-pool:
-  vmImage: "ubuntu-latest"
+# Este archivo define el pipeline de CI/CD para Azure DevOps
+# Se ejecuta automáticamente en cada push a la rama principal
+
+trigger:
+  - main # Se ejecuta cuando hay push a la rama main
+  - develop # También se ejecuta en develop para testing
 
 variables:
-  COVERAGE_THRESHOLD: 80
-  TEST_TIMEOUT: 300
-  NODE_VERSION: "18.x"
-  GO_VERSION: "1.21"
+  # Variables globales del pipeline
+  buildConfiguration: "Release"
+  nodeVersion: "18.x"
+  goVersion: "1.21"
 
 stages:
   - stage: Build
-    displayName: "Build Applications"
+    displayName: "Build Stage"
     jobs:
-      - job: BuildBackend
-        displayName: "Build Backend (Go)"
-        steps:
-          - task: GoTool@0
-            inputs:
-              version: "$(GO_VERSION)"
-          - script: |
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
-              go mod download
-              go build -o backend.exe .
-            displayName: "Build Go Application"
+      - job: BuildJob
+        displayName: "Build Application"
+        pool:
+          vmImage: "ubuntu-latest" # Usar Ubuntu para mejor compatibilidad
 
-      - job: BuildFrontend
-        displayName: "Build Frontend (Next.js)"
         steps:
+          # Paso 1: Checkout del código
+          - checkout: self
+            displayName: "Checkout Code"
+
+          # Paso 2: Configurar Node.js
           - task: NodeTool@0
+            displayName: "Setup Node.js"
             inputs:
-              versionSpec: "$(NODE_VERSION)"
-          - script: |
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
-              npm ci
-              npm run build
-            displayName: "Build Next.js Application"
+              versionSpec: $(nodeVersion)
 
-  - stage: Test
-    displayName: "Run Unit Tests"
-    dependsOn: Build
-    jobs:
-      - job: TestBackend
-        displayName: "Test Backend"
-        steps:
+          # Paso 3: Configurar Go
           - task: GoTool@0
+            displayName: "Setup Go"
             inputs:
-              version: "$(GO_VERSION)"
+              version: $(goVersion)
+
+          # Paso 4: Instalar dependencias del frontend
           - script: |
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
-              go test -v -coverprofile=coverage.out ./tests/...
-            displayName: "Run Go Tests"
+              echo "Instalando dependencias del frontend..."
+              npm ci
+            displayName: "Install Frontend Dependencies"
+
+          # Paso 5: Instalar dependencias del backend
           - script: |
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
-              go tool cover -html=coverage.out -o coverage.html
+              echo "Instalando dependencias del backend..."
+              cd EMARVE/backend
+              go mod download
+              go mod tidy
+            displayName: "Install Backend Dependencies"
+
+          # Paso 6: Ejecutar linters
+          - script: |
+              echo "Ejecutando linters..."
+              make lint
+            displayName: "Run Linters"
+
+          # Paso 7: Ejecutar todos los tests
+          - script: |
+              echo "Ejecutando todos los tests..."
+              make test
+            displayName: "Run All Tests"
+            continueOnError: false # Falla el pipeline si los tests fallan
+
+          # Paso 8: Generar reporte de cobertura
+          - script: |
+              echo "Generando reporte de cobertura..."
+              make test-coverage
             displayName: "Generate Coverage Report"
 
-      - job: TestFrontend
-        displayName: "Test Frontend"
-        steps:
-          - task: NodeTool@0
+          # Paso 9: Publicar resultados de tests
+          - task: PublishTestResults@2
+            displayName: "Publish Test Results"
             inputs:
-              versionSpec: "$(NODE_VERSION)"
-          - script: |
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
-              npm test -- --coverage --watchAll=false --passWithNoTests
-            displayName: "Run React Tests"
+              testResultsFormat: "JUnit"
+              testResultsFiles: "**/test-results.xml"
+              mergeTestResults: true
+              failTaskOnFailedTests: true
 
-  - stage: Coverage
-    displayName: "Coverage Analysis"
-    dependsOn: Test
-    jobs:
-      - job: CoverageAnalysis
-        displayName: "Analyze Coverage"
-        steps:
-          - script: |
-              echo "Backend Coverage:"
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/backend
-              go tool cover -func=coverage.out
-            displayName: "Backend Coverage"
-          - script: |
-              echo "Frontend Coverage:"
-              cd 2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front
-              cat coverage/lcov.info
-            displayName: "Frontend Coverage"
+          # Paso 10: Publicar reporte de cobertura
+          - task: PublishCodeCoverageResults@1
+            displayName: "Publish Coverage Report"
+            inputs:
+              codeCoverageTool: "Cobertura"
+              summaryFileLocation: "**/coverage.xml"
+              reportDirectory: "**/coverage"
 
-  - stage: QualityGate
-    displayName: "Quality Gate"
-    dependsOn: Coverage
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
-    jobs:
-      - job: QualityCheck
-        displayName: "Quality Check"
-        steps:
+          # Paso 11: Build de la aplicación
           - script: |
-              echo "Quality Gate: Coverage must be >= $(COVERAGE_THRESHOLD)%"
-              echo "All tests must pass"
-            displayName: "Quality Gate Check"
+              echo "Building application..."
+              npm run build
+            displayName: "Build Frontend"
 
-  - stage: PublishArtifacts
-    displayName: "Publish Artifacts"
-    dependsOn: QualityGate
-    jobs:
-      - job: PublishReports
-        displayName: "Publish Test Reports"
-        steps:
+          # Paso 12: Build del backend
+          - script: |
+              echo "Building backend..."
+              cd EMARVE/backend
+              go build -o main .
+            displayName: "Build Backend"
+
+          # Paso 13: Publicar artefactos
           - task: PublishBuildArtifacts@1
+            displayName: "Publish Build Artifacts"
             inputs:
-              pathToPublish: "2025_TP06_Pruebas_Unitarias/EMARVE/backend/coverage.html"
-              artifactName: "BackendCoverage"
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: "2025_TP06_Pruebas_Unitarias/EMARVE/frontend/front/coverage"
-              artifactName: "FrontendCoverage"
+              pathToPublish: "$(System.DefaultWorkingDirectory)"
+              artifactName: "drop"
+
+  - stage: Deploy
+    displayName: "Deploy Stage"
+    dependsOn: Build
+    condition: succeeded() # Solo se ejecuta si Build fue exitoso
+    jobs:
+      - deployment: DeployJob
+        displayName: "Deploy to Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        environment: "production" # Ambiente de producción
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Paso 1: Desplegar frontend
+                - script: |
+                    echo "Desplegando frontend..."
+                    # Aquí irían los comandos específicos de despliegue
+                    # Por ejemplo: docker-compose up -d
+                  displayName: "Deploy Frontend"
+
+                # Paso 2: Desplegar backend
+                - script: |
+                    echo "Desplegando backend..."
+                    # Aquí irían los comandos específicos de despliegue
+                  displayName: "Deploy Backend"
+
+                # Paso 3: Verificar despliegue
+                - script: |
+                    echo "Verificando despliegue..."
+                    # Health checks, smoke tests, etc.
+                  displayName: "Verify Deployment"
+
+  # Configuración adicional para notificaciones
+  - stage: Notify
+    displayName: "Notification Stage"
+    dependsOn:
+      - Build
+      - Deploy
+    condition: always() # Siempre se ejecuta
+    jobs:
+      - job: NotifyJob
+        displayName: "Send Notifications"
+        pool:
+          vmImage: "ubuntu-latest"
+
+        steps:
+          - script: |
+              echo "Enviando notificaciones..."
+              # Aquí podrías integrar con Slack, Teams, email, etc.
+            displayName: "Send Success/Failure Notifications"

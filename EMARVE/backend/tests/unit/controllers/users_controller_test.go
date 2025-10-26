@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"backend/controllers/users"
 	"backend/domain"
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +40,7 @@ func (m *MockUserService) AddComment(userID, courseID int64, comment string) err
 	return args.Error(0)
 }
 
-func (m *MockUserService) UploadFiles(file interface{}, filename string, userID, courseID int64) error {
+func (m *MockUserService) UploadFiles(file io.Reader, filename string, userID, courseID int64) error {
 	args := m.Called(file, filename, userID, courseID)
 	return args.Error(0)
 }
@@ -53,12 +55,17 @@ func (m *MockUserService) GetUserID(tokenString string) (int, error) {
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockUserService) GetUserById(userID int64) (*domain.User, error) {
+	args := m.Called(userID)
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
 func TestLogin_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 	expectedToken := "test-token-123"
 
 	loginRequest := domain.LoginRequest{
@@ -95,7 +102,7 @@ func TestLogin_InvalidRequest(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	// Act
 	w := httptest.NewRecorder()
@@ -115,7 +122,7 @@ func TestUserRegister_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	registrationRequest := domain.RegistrationRequest{
 		Nickname: "testuser",
@@ -151,7 +158,7 @@ func TestLogin_Unauthorized(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	loginRequest := domain.LoginRequest{
 		Email:    "test@example.com",
@@ -179,7 +186,7 @@ func TestUserRegister_Conflict(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	registrationRequest := domain.RegistrationRequest{
 		Nickname: "testuser",
@@ -209,7 +216,7 @@ func TestSubscriptionList_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	expectedCourses := []domain.Course{
 		{Id: 1, Title: "Course 1", Description: "Description 1"},
@@ -241,7 +248,7 @@ func TestAddComment_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	commentRequest := domain.CommentRequest{
 		UserID:   1,
@@ -276,7 +283,7 @@ func TestUserAuthentication_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	authHeader := "Bearer valid-token"
 	expectedUserType := "admin"
@@ -306,7 +313,7 @@ func TestGetUserID_Success(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	mockService := new(MockUserService)
-	controller := NewUserController(mockService)
+	controller := users.NewUserController(mockService)
 
 	authHeader := "Bearer valid-token"
 	expectedUserID := 123
@@ -328,6 +335,102 @@ func TestGetUserID_Success(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedUserID, response.Message)
+
+	mockService.AssertExpectations(t)
+}
+
+// Tests para nuevos métodos
+
+func TestGetUserById_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockUserService)
+	controller := users.NewUserController(mockService)
+
+	// Configurar mock
+	expectedUser := &domain.User{
+		Id:       1,
+		Nickname: "usuario1",
+		Email:    "usuario1@test.com",
+		Type:     false,
+	}
+	mockService.On("GetUserById", int64(1)).Return(expectedUser, nil)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/users/1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	// Ejecutar
+	controller.GetUserById(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response domain.UserResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedUser.Id, response.Id)
+	assert.Equal(t, expectedUser.Nickname, response.Nickname)
+	assert.Equal(t, expectedUser.Email, response.Email)
+	assert.Equal(t, expectedUser.Type, response.Type)
+
+	mockService.AssertExpectations(t)
+}
+
+func TestGetUserById_InvalidID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockUserService)
+	controller := users.NewUserController(mockService)
+
+	// Crear request con ID inválido
+	req, _ := http.NewRequest("GET", "/users/invalid", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "invalid"}}
+
+	// Ejecutar
+	controller.GetUserById(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "invalid id")
+}
+
+func TestGetUserById_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockUserService)
+	controller := users.NewUserController(mockService)
+
+	// Configurar mock para error
+	mockService.On("GetUserById", int64(1)).Return((*domain.User)(nil), assert.AnError)
+
+	// Crear request
+	req, _ := http.NewRequest("GET", "/users/1", nil)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	// Ejecutar
+	controller.GetUserById(c)
+
+	// Verificar
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var response domain.Result
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response.Message, "user not found")
 
 	mockService.AssertExpectations(t)
 }

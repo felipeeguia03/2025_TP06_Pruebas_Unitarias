@@ -1,7 +1,6 @@
 package interfaces
 
 import (
-	"backend/dao"
 	"backend/domain"
 	"io"
 )
@@ -15,15 +14,16 @@ type UserServiceInterface interface {
 	UploadFiles(file io.Reader, filename string, userID, courseID int64) error
 	UserAuthentication(tokenString string) (string, error)
 	GetUserID(tokenString string) (int, error)
+	GetUserById(userID int64) (*domain.User, error)
 }
 
 // UserRepositoryInterface define las operaciones de acceso a datos de usuarios
 type UserRepositoryInterface interface {
-	GetUserByEmail(email string) (*dao.User, error)
-	CreateUser(user dao.User) error
-	GetUserById(id int64) (*dao.User, error)
+	GetUserByEmail(email string) (*domain.User, error)
+	CreateUser(user domain.User) error
+	GetUserById(id int64) (*domain.User, error)
 	GetCourseIdsByUserId(userID int64) ([]int64, error)
-	GetCourseById(courseID int64) (*dao.Course, error)
+	GetCourseById(courseID int64) (*domain.Course, error)
 	InsertComment(userID, courseID int64, comment string) error
-	SaveFile(file dao.File) error
+	SaveFile(file domain.File) error
 }

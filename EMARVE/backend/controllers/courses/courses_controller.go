@@ -75,6 +75,50 @@ func (cc *CourseController) GetAllCourses(c *gin.Context) {
 	})
 }
 
+func (cc *CourseController) GetCourseImages(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, courseDomain.Result{
+			Message: fmt.Sprintf("invalid id: %s", err.Error()),
+		})
+		return
+	}
+
+	images, err := cc.courseService.GetCourseImages(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, courseDomain.Result{
+			Message: fmt.Sprintf("error getting images for course %d: %s", id, err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, courseDomain.FileListResponse{
+		Result: images,
+	})
+}
+
+func (cc *CourseController) GetCoursesByInstructor(c *gin.Context) {
+	instructor := c.Param("instructor")
+	if instructor == "" {
+		c.JSON(http.StatusBadRequest, courseDomain.Result{
+			Message: "instructor parameter is required",
+		})
+		return
+	}
+
+	results, err := cc.courseService.GetCoursesByInstructor(instructor)
+	if err != nil {
+		c.JSON(http.StatusNotFound, courseDomain.Result{
+			Message: fmt.Sprintf("error getting courses for instructor %s: %s", instructor, err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, courseDomain.ListResponse{
+		Result: results,
+	})
+}
+
 func (cc *CourseController) Subscription(c *gin.Context) {
 	var subscribeRequest courseDomain.SubscribeRequest
 

@@ -1,0 +1,80 @@
+services:
+  # Base de datos MySQL para desarrollo
+  mysql-dev:
+    image: mysql:8.0
+    container_name: emarve-mysql-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: emarve_db_dev
+      MYSQL_USER: emarve_user
+      MYSQL_PASSWORD: emarve_password
+    ports:
+      - "3309:3306"  # Puerto diferente para desarrollo
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    networks:
+      - emarve-dev-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend Go en modo desarrollo (con hot reload)
+  backend-dev:
+    build:
+      context: ./EMARVE/backend
+      dockerfile: Dockerfile.dev
+    container_name: emarve-backend-dev
+    environment:
+      DB_HOST: mysql-dev
+      DB_USER: emarve_user
+      DB_PASSWORD: emarve_password
+      DB_NAME: emarve_db_dev
+      DB_PORT: 3306
+      PORT: 8080
+      GO_ENV: development
+    ports:
+      - "8083:8080"
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+    volumes:
+      - ./EMARVE/backend:/app
+      - /app/vendor  # Evitar conflictos con vendor de Go
+    networks:
+      - emarve-dev-network
+    restart: unless-stopped
+    command: ["air", "-c", ".air.toml"]  # Hot reload con Air
+
+  # Frontend Next.js en modo desarrollo
+  frontend-dev:
+    build:
+      context: ./EMARVE/frontend/front
+      dockerfile: Dockerfile.dev
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8083
+    container_name: emarve-frontend-dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8083
+      NODE_ENV: development
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3003:3000"
+    depends_on:
+      - backend-dev
+    volumes:
+      - ./EMARVE/frontend/front:/app
+      - /app/node_modules  # Evitar conflictos con node_modules
+      - /app/.next  # Evitar conflictos con build cache
+    networks:
+      - emarve-dev-network
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+
+volumes:
+  mysql_dev_data:
+
+networks:
+  emarve-dev-network:
+    driver: bridge

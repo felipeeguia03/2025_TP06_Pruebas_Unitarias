@@ -3,4 +3,3 @@ import { handlers } from './handlers';
 
 // Configurar el servidor MSW para tests
 export const server = setupServer(...handlers);
-

@@ -299,7 +299,7 @@ func TestSubscriptionList_UserNotFound(t *testing.T) {
 
 Dependencias principales:
 
-Para el Mocking de APIs decidimos usar MSW (Mock Service Worker)debido a que intercepta requests HTTP y simula respuestas de backend. Jest po su parte lo usamos para
+Para el Mocking de APIs decidimos usar MSW (Mock Service Worker)debido a que intercepta requests HTTP y simula respuestas de backend. Jest po su parte lo usamos para ejecutar los test
 
 Lo que queremos hacer es probar el componente Login de React de forma aislada para verificar:
 -Renderización correcta

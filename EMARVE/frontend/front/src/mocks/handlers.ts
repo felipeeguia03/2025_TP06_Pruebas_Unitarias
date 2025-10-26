@@ -247,6 +247,73 @@ export const handlers = [
       { error: 'Missing required fields' },
       { status: 400 }
     );
+  }),
+
+  // Create course (Admin)
+  http.post('/courses', async ({ request }) => {
+    const body = await request.json() as {
+      title: string;
+      description: string;
+      category: string;
+      instructor: string;
+      duration: number;
+      requirement: string;
+    };
+    
+    if (body.title && body.description && body.category && body.instructor) {
+      return HttpResponse.json({
+        message: 'Course created successfully',
+        course: {
+          id: 3,
+          ...body,
+          creation_date: new Date().toISOString(),
+          last_update: new Date().toISOString()
+        }
+      });
+    }
+    
+    return HttpResponse.json(
+      { error: 'Missing required fields' },
+      { status: 400 }
+    );
+  }),
+
+  // Update course (Admin)
+  http.put('/courses/:id', async ({ request, params }) => {
+    const { id } = params;
+    const body = await request.json() as {
+      title: string;
+      description: string;
+      category: string;
+      instructor: string;
+      duration: number;
+      requirement: string;
+    };
+    
+    if (body.title && body.description && body.category && body.instructor) {
+      return HttpResponse.json({
+        message: 'Course updated successfully',
+        course: {
+          id: parseInt(id as string),
+          ...body,
+          last_update: new Date().toISOString()
+        }
+      });
+    }
+    
+    return HttpResponse.json(
+      { error: 'Missing required fields' },
+      { status: 400 }
+    );
+  }),
+
+  // Delete course (Admin)
+  http.delete('/courses/:id', ({ params }) => {
+    const { id } = params;
+    return HttpResponse.json({
+      message: 'Course deleted successfully',
+      deleted_course_id: parseInt(id as string)
+    });
   })
 ];
 

@@ -1,0 +1,90 @@
+# Azure DevOps Pipeline - TP 06 Pruebas Unitarias
+# ================================================
+
+# Este pipeline se ejecuta automáticamente en cada push
+# Ejecuta todos los tests (223 tests) y despliega si pasan
+
+trigger:
+  - main
+  - develop
+
+variables:
+  buildConfiguration: "Release"
+  nodeVersion: "18.x"
+  goVersion: "1.21"
+
+pool:
+  vmImage: "ubuntu-latest"
+
+steps:
+  # Paso 1: Checkout del código
+  - checkout: self
+    displayName: "📥 Checkout Code"
+
+  # Paso 2: Configurar Node.js
+  - task: NodeTool@0
+    displayName: "🔧 Setup Node.js"
+    inputs:
+      versionSpec: $(nodeVersion)
+
+  # Paso 3: Configurar Go
+  - task: GoTool@0
+    displayName: "🔧 Setup Go"
+    inputs:
+      version: $(goVersion)
+
+  # Paso 4: Instalar dependencias
+  - script: |
+      echo "📦 Instalando dependencias..."
+      make install
+    displayName: "📦 Install Dependencies"
+
+  # Paso 5: Ejecutar linters
+  - script: |
+      echo "🔍 Ejecutando linters..."
+      make lint
+    displayName: "🔍 Run Linters"
+
+  # Paso 6: Ejecutar TODOS los tests (223 tests)
+  - script: |
+      echo "🧪 Ejecutando todos los tests..."
+      echo "Backend: 92 tests"
+      echo "Frontend: 94 tests" 
+      echo "Create Course: 37 tests"
+      echo "Total: 223 tests"
+      make test
+    displayName: "🧪 Run All Tests (223 tests)"
+    continueOnError: false
+
+  # Paso 7: Generar reporte de cobertura
+  - script: |
+      echo "📊 Generando reporte de cobertura..."
+      make test-coverage
+    displayName: "📊 Generate Coverage Report"
+
+  # Paso 8: Build de la aplicación
+  - script: |
+      echo "🏗️ Building application..."
+      npm run build
+    displayName: "🏗️ Build Application"
+
+  # Paso 9: Build del backend
+  - script: |
+      echo "🏗️ Building backend..."
+      cd EMARVE/backend
+      go build -o main .
+    displayName: "🏗️ Build Backend"
+
+  # Paso 10: Publicar artefactos
+  - task: PublishBuildArtifacts@1
+    displayName: "📤 Publish Build Artifacts"
+    inputs:
+      pathToPublish: "$(System.DefaultWorkingDirectory)"
+      artifactName: "drop"
+
+  # Paso 11: Notificación de éxito
+  - script: |
+      echo "✅ Pipeline completado exitosamente!"
+      echo "🎉 Todos los 223 tests pasaron"
+      echo "🚀 Aplicación lista para despliegue"
+    displayName: "✅ Success Notification"

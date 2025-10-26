@@ -1,99 +1,45 @@
-import "@testing-library/jest-dom";
-import { server } from "./src/mocks/server";
+// Configurar React en modo desarrollo para permitir act() en tests
+process.env.NODE_ENV = "development";
 
-// Configurar MSW para tests
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
-
-// Configurar tipos globales
-declare global {
-  var jest: any;
-  var describe: any;
-  var it: any;
-  var expect: any;
-  var beforeEach: any;
-  var beforeAll: any;
-  var afterEach: any;
-  var afterAll: any;
+// Mock de localStorage para entorno node
+if (typeof global !== "undefined") {
+  global.localStorage = {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+    clear: jest.fn(),
+  };
 }
 
-// Mock de Next.js router
-jest.mock("next/router", () => ({
-  useRouter() {
-    return {
-      route: "/",
-      pathname: "/",
-      query: {},
-      asPath: "/",
-      push: jest.fn(),
-      pop: jest.fn(),
-      reload: jest.fn(),
-      back: jest.fn(),
-      prefetch: jest.fn().mockResolvedValue(undefined),
-      beforePopState: jest.fn(),
-      events: {
-        on: jest.fn(),
-        off: jest.fn(),
-        emit: jest.fn(),
-      },
-      isFallback: false,
-    };
-  },
-}));
-
-// Mock de Next.js navigation
-jest.mock("next/navigation", () => ({
-  useRouter() {
-    return {
-      push: jest.fn(),
+// Mock de window para entorno node
+if (typeof global !== "undefined") {
+  global.window = {
+    location: {
+      href: "http://localhost:3000",
+      assign: jest.fn(),
       replace: jest.fn(),
-      prefetch: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      refresh: jest.fn(),
-    };
-  },
-  useSearchParams() {
-    return new URLSearchParams();
-  },
-  usePathname() {
-    return "/";
-  },
-}));
-
-// Mock de axios
-jest.mock("axios", () => ({
-  create: jest.fn(() => ({
-    get: jest.fn(),
-    post: jest.fn(),
-    put: jest.fn(),
-    delete: jest.fn(),
-    interceptors: {
-      request: { use: jest.fn() },
-      response: { use: jest.fn() },
+      reload: jest.fn(),
     },
-  })),
-  get: jest.fn(),
-  post: jest.fn(),
-  put: jest.fn(),
-  delete: jest.fn(),
-}));
+    localStorage: global.localStorage,
+  };
+}
 
-// Mock de localStorage
-const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-};
-global.localStorage = localStorageMock;
+// Mock de document para entorno node
+if (typeof global !== "undefined") {
+  global.document = {
+    createElement: jest.fn(() => ({
+      setAttribute: jest.fn(),
+      appendChild: jest.fn(),
+    })),
+    getElementById: jest.fn(),
+    querySelector: jest.fn(),
+    querySelectorAll: jest.fn(() => []),
+  };
+}
 
-// Mock de sessionStorage
-const sessionStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-};
-global.sessionStorage = sessionStorageMock;
+// Mock de navigator para entorno node
+if (typeof global !== "undefined") {
+  global.navigator = {
+    userAgent: "node",
+  };
+}

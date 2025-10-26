@@ -1,7 +1,6 @@
 package courses
 
 import (
-	"backend/dao"
 	"backend/domain"
 	"backend/interfaces"
 	"time"
@@ -94,6 +93,32 @@ func (s *courseService) GetAllCourses() ([]domain.Course, error) {
 	return results, nil
 }
 
+func (s *courseService) GetCourseImages(courseID int64) ([]domain.File, error) {
+	if courseID <= 0 {
+		return nil, errors.New("invalid course ID")
+	}
+
+	images, err := s.repo.GetCourseImages(courseID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting images for course %d from DB: %v", courseID, err)
+	}
+
+	return images, nil
+}
+
+func (s *courseService) GetCoursesByInstructor(instructor string) ([]domain.Course, error) {
+	if strings.TrimSpace(instructor) == "" {
+		return nil, errors.New("instructor is required")
+	}
+
+	results, err := s.repo.GetCoursesByInstructor(instructor)
+	if err != nil {
+		return nil, fmt.Errorf("error getting courses for instructor %s from DB: %v", instructor, err)
+	}
+
+	return results, nil
+}
+
 func (s *courseService) Subscription(userID int64, courseID int64) error {
 
 	if _, err := s.repo.GetUserById(userID); err != nil {
@@ -137,7 +162,7 @@ func (s *courseService) CreateCourse(title string, description string, category 
 		return errors.New("requirement is required")
 	}
 
-	NewCourse := dao.Course{
+	NewCourse := domain.Course{
 		Title:        title,
 		Description:  description,
 		Category:     category,
@@ -182,7 +207,7 @@ func (s *courseService) UpdateCourse(courseID int64, title string, description s
 		return errors.New("requirement is required")
 	}
 
-	courseUpdate := dao.Course{
+	courseUpdate := domain.Course{
 		Title:       title,
 		Description: description,
 		Category:    category,
@@ -217,7 +242,7 @@ func (s *courseService) CommentList(CourseID int64) ([]domain.CommentResponse, e
 		return nil, fmt.Errorf("error getting comments IDs for course ID %d: %v", CourseID, err)
 	}
 
-	var comments []dao.Comment
+	var comments []domain.Comment
 
 	for _, commentID := range commentIDs {
 		comment, err := s.repo.GetCommentById(commentID)
@@ -231,8 +256,8 @@ func (s *courseService) CommentList(CourseID int64) ([]domain.CommentResponse, e
 
 	for _, comment := range comments {
 		results = append(results, domain.CommentResponse{
-			UserID:  comment.User_Id,
-			Comment: comment.Text,
+			UserID:  comment.UserID,
+			Comment: comment.Comment,
 		})
 	}
 
